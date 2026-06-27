@@ -74,7 +74,7 @@ func DefaultConfig() Config {
 	return Config{
 		Server: Server{
 			HTTP: ServerHTTP{
-				Listen:  ":40172",
+				Listen:  ":23108",
 				WebRoot: "",
 				TLS: ServerHTTPTLS{
 					Enabled:        false,

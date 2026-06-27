@@ -7,7 +7,7 @@ server:
 
   # HTTP 服务配置
   http:
-    listen: ":40172" # HTTP 服务监听地址
+    listen: ":23108" # HTTP 服务监听地址
     web-root: "" # 静态 Web 根目录，留空则不托管前端
 
     # HTTPS TLS 配置
