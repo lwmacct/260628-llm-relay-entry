@@ -1,0 +1,59 @@
+# 默认配置示例文件, 此文件由单元测试生成, 请勿直接修改
+# 复制此文件为 config.yaml 并根据需要修改
+
+# 服务端配置
+server:
+  debug: false # 启用调试日志和诊断信息
+
+  # HTTP 服务配置
+  http:
+    listen: ":40172" # HTTP 服务监听地址
+    web-root: "" # 静态 Web 根目录，留空则不托管前端
+
+    # HTTPS TLS 配置
+    tls:
+      enabled: false # 是否启用 HTTPS TLS
+      cert-file: "${APP_DATA:-.local/data}/ssl/fullchain.pem" # TLS 证书文件路径
+      key-file: "${APP_DATA:-.local/data}/ssl/privkey.pem" # TLS 私钥文件路径
+      auto-reload: true # 是否自动重载 TLS 证书文件
+      reload-interval: 3s # TLS 证书文件自动重载检查间隔
+    read-header-timeout: 10s # HTTP 请求头读取超时
+    read-timeout: 0s # HTTP 请求读取超时；0 表示不限制，适合流式入口
+    write-timeout: 0s # HTTP 响应写入超时；0 表示不限制，适合长流式响应
+    idle-timeout: 1m0s # HTTP 空闲连接超时时间
+    shutdown-timeout: 15s # 优雅关闭超时时间
+    max-api-body-bytes: 1048576 # 普通 HTTP API 最大请求体字节数，0 表示不限制；Codex relay 入口不使用该限制
+    enable-debug-requests: true # 调试日志级别下记录请求元数据，不记录 body 和敏感头
+
+  # Codex relay entry 适配配置
+  adapter:
+
+    # 下游 relay 配置
+    relay:
+      base-url: "${CODING_ADAPTER_RELAY_BASE_URL:-http://localhost:40174}" # 下游 relay base URL
+      max-idle-conns: 4096 # 下游 relay 全局空闲连接池容量；只影响连接复用，不限制活跃并发
+      max-idle-conns-per-host: 2048 # 下游 relay 单 host 空闲连接池容量；只影响连接复用，不限制活跃并发
+      max-conns-per-host: 0 # 下游 relay 单 host 活跃连接上限；0 表示不限制
+      idle-conn-timeout: 1m0s # 下游 relay 空闲连接在连接池中的保留时间
+      disable-keep-alives: false # 是否禁用下游 relay keep-alive
+      rate-limit-cooldown-ttl: 5m0s # Relay 返回 429 后向 runtime 上报的资源冷却时间
+      rate-limit-retry-after: 2s # Relay 返回 429 后返回客户端的 Retry-After
+
+    # context-chain Runtime 配置
+    runtime:
+      api-base-url: "${CONTEXT_CHAINS_API_BASE_URL:-http://localhost:40173}" # context-chain Runtime HTTP API base URL
+      auth-token: "${CONTEXT_CHAINS_HTTP_TOKEN:-lwmacct}" # Runtime HTTP API Bearer token，为空则不发送
+      plan-id: "${CONTEXT_CHAINS_PLAN_ID:-default}" # Runtime resolve 使用的 plan_id
+      resolve-timeout: 10s # Runtime resolve HTTP 超时
+      report-timeout: 2s # Runtime report HTTP 超时
+      allow-partial-failover: false # 是否允许 Runtime 部分失败降级返回
+
+  # 入口 token 鉴权配置
+  token-auth:
+
+    # 基于 Redis Bloom Filter 的 token 鉴权配置
+    redis-bloom:
+      enabled: true # 是否启用 Redis Bloom Filter token 鉴权
+      url: "${REDIS_URL:-redis://localhost:6379/0}" # Redis URL，支持 REDIS_URL 环境变量
+      password: "${REDISCLI_AUTH}" # Redis 密码，支持 REDISCLI_AUTH 环境变量
+      key-prefix: "token:white" # Redis key 前缀

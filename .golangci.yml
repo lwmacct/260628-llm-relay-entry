@@ -1,0 +1,96 @@
+version: "2"
+
+linters:
+  default: all
+  disable:
+    # 过于严格/不适用
+    - depguard # 需要配置依赖白名单
+    - wrapcheck # 要求所有错误都 wrap
+    - exhaustruct # 要求所有字段都初始化
+    - ireturn # 禁止返回接口
+    - varnamelen # 变量名长度限制
+    - nlreturn # return 前必须空行
+    - wsl_v5 # 空行规则过严
+    - funlen # 函数长度限制
+    - gocognit # 认知复杂度
+    - cyclop # 圈复杂度
+    - lll # 行长度限制
+    - godox # 禁止 TODO/FIXME
+    - godot # 注释句号结尾
+    - mnd # magic number
+    - err113 # 错误定义规则过严
+    - gochecknoglobals # 禁止全局变量
+    - gochecknoinits # 禁止 init 函数
+    - noinlineerr # 禁止内联错误处理
+    - paralleltest # 要求 t.Parallel()
+    - testpackage # 要求 _test 包
+    # 特定框架
+    - arangolint # ArangoDB
+    - ginkgolinter # Ginkgo
+    - zerologlint # zerolog
+    - loggercheck # logger 检查
+    - spancheck # OpenTelemetry
+    - promlinter # Prometheus
+    - protogetter # protobuf
+    - gosmopolitan # i18n
+    # 已弃用
+    - wsl
+    - gomodguard
+    # 注释要求过严
+    - revive # 与 staticcheck 重复，规则过严
+    - errname # 错误命名规则
+    - goprintffuncname # printf 函数命名
+    # 不合理的优化
+    - tagalign # struct tag 对齐, 负优化
+    - tagliatelle # JSON tag 使用 snake_case 以兼容 OpenAI/Anthropic/Gemini API
+    - goconst # 协议适配和测试中的字符串字面量是合理的
+    # 历史代码中不具备明确收益的机械改写
+    - dupl # 重复片段不一定适合抽象，按需重构
+    - forcetypeassert # 测试 mock 中断言失败应直接 panic
+    - funcorder # 不强制按可见性重排方法
+    - gocyclo # 复杂度由可读性和测试覆盖评估
+    - godoclint # 不强制注释格式
+    - iface # 测试中的接口兼容性断言会触发
+    - inamedparam # 不强制接口参数命名
+    - interfacebloat # 接口拆分应依据职责，而非方法数量
+    - intrange # 不机械改写已有循环
+    - modernize # 不机械升级已有实现风格
+    - nestif # 嵌套应结合业务语义重构
+    - nonamedreturns # 允许在适合的场景使用命名返回值
+    - prealloc # 不为微小收益增加样板代码
+    - testifylint # 不机械修改已有测试断言
+    - unconvert # 本地化的协议实现中允许显式转换
+    - unparam # 测试辅助 API 允许保留稳定签名
+
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+    misspell:
+      locale: US
+    nakedret:
+      max-func-lines: 30
+    gocritic: {}
+    exhaustive:
+      default-signifies-exhaustive: true
+    nestif:
+      min-complexity: 3 # JSON 解析等场景允许适度嵌套
+
+  exclusions:
+    paths:
+      - node_modules
+      - pkg/bare
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    paths:
+      - node_modules
+      - pkg/bare
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
