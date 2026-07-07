@@ -73,7 +73,7 @@ func newRuntime(ctx context.Context, cfg *config.Config) (*runtimeState, error) 
 		codexEntries:  codexEntries,
 	}
 
-	tlsRuntime, err := newTLSRuntime(ctx, cfg.Server.HTTP.TLS)
+	tlsRuntime, err := newTLSRuntime(ctx, cfg.Server.HTTP.TLS.TLSReloadConfig())
 	if err != nil {
 		rt.Close()
 		return nil, fmt.Errorf("configure tls: %w", err)

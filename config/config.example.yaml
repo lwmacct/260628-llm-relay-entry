@@ -13,10 +13,8 @@ server:
     # HTTPS TLS 配置
     tls:
       enabled: false # 是否启用 HTTPS TLS
-      cert-file: "${APP_DATA:-.local/data}/ssl/fullchain.pem" # TLS 证书文件路径
-      key-file: "${APP_DATA:-.local/data}/ssl/privkey.pem" # TLS 私钥文件路径
-      auto-reload: true # 是否自动重载 TLS 证书文件
-      reload-interval: 3s # TLS 证书文件自动重载检查间隔
+      cert-file: "${APP_DATA:-.local/data}/ssl/fullchain.pem" # TLS 证书文件路径或 URI
+      key-file: "${APP_DATA:-.local/data}/ssl/privkey.pem" # TLS 私钥文件路径或 URI
     read-header-timeout: 10s # HTTP 请求头读取超时
     read-timeout: 0s # HTTP 请求读取超时；0 表示不限制，适合流式入口
     write-timeout: 0s # HTTP 响应写入超时；0 表示不限制，适合长流式响应

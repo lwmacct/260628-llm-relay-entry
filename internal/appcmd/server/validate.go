@@ -27,14 +27,5 @@ func validateConfig(cfg *config.Config) error {
 }
 
 func validateHTTPTLS(tlsConfig config.ServerHTTPTLS) error {
-	if !tlsConfig.Enabled {
-		return nil
-	}
-	if (tlsConfig.CertFile == "") != (tlsConfig.KeyFile == "") {
-		return errors.New("http tls.cert-file and tls.key-file must be configured together")
-	}
-	if tlsConfig.AutoReload && tlsConfig.ReloadInterval <= 0 {
-		return errors.New("http tls.reload-interval must be greater than zero when http tls.auto-reload is true")
-	}
-	return nil
+	return tlsConfig.TLSReloadConfig().Validate()
 }

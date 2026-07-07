@@ -53,16 +53,6 @@ func commandFlags() []cli.Flag {
 			Usage: usage.MustUsage("http.tls.key-file"),
 			Value: defaults.Server.HTTP.TLS.KeyFile,
 		},
-		&cli.BoolFlag{
-			Name:  "http.tls.auto-reload",
-			Usage: usage.MustUsage("http.tls.auto-reload"),
-			Value: defaults.Server.HTTP.TLS.AutoReload,
-		},
-		&cli.DurationFlag{
-			Name:  "http.tls.reload-interval",
-			Usage: usage.MustUsage("http.tls.reload-interval"),
-			Value: defaults.Server.HTTP.TLS.ReloadInterval,
-		},
 		&cli.DurationFlag{
 			Name:  "http.read-header-timeout",
 			Usage: usage.MustUsage("http.read-header-timeout"),

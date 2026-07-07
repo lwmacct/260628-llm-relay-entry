@@ -1,6 +1,10 @@
 package config
 
-import "time"
+import (
+	"time"
+
+	"github.com/lwmacct/260614-go-pkg-tlsreload/pkg/tlsreload"
+)
 
 type Config struct {
 	Server Server `json:"server" desc:"服务端配置"`
@@ -27,11 +31,17 @@ type ServerHTTP struct {
 }
 
 type ServerHTTPTLS struct {
-	Enabled        bool          `json:"enabled"         desc:"是否启用 HTTPS TLS"`
-	CertFile       string        `json:"cert-file"       desc:"TLS 证书文件路径"`
-	KeyFile        string        `json:"key-file"        desc:"TLS 私钥文件路径"`
-	AutoReload     bool          `json:"auto-reload"     desc:"是否自动重载 TLS 证书文件"`
-	ReloadInterval time.Duration `json:"reload-interval" desc:"TLS 证书文件自动重载检查间隔"`
+	Enabled  bool   `json:"enabled"   desc:"是否启用 HTTPS TLS"`
+	CertFile string `json:"cert-file" desc:"TLS 证书文件路径或 URI"`
+	KeyFile  string `json:"key-file"  desc:"TLS 私钥文件路径或 URI"`
+}
+
+func (cfg ServerHTTPTLS) TLSReloadConfig() tlsreload.Config {
+	return tlsreload.Config{
+		Enabled:  cfg.Enabled,
+		CertFile: cfg.CertFile,
+		KeyFile:  cfg.KeyFile,
+	}
 }
 
 type Adapter struct {
@@ -77,11 +87,9 @@ func DefaultConfig() Config {
 				Listen:  ":23108",
 				WebRoot: "",
 				TLS: ServerHTTPTLS{
-					Enabled:        false,
-					CertFile:       "${APP_DATA:-.local/data}/ssl/fullchain.pem",
-					KeyFile:        "${APP_DATA:-.local/data}/ssl/privkey.pem",
-					AutoReload:     true,
-					ReloadInterval: 3 * time.Second,
+					Enabled:  false,
+					CertFile: "${APP_DATA:-.local/data}/ssl/fullchain.pem",
+					KeyFile:  "${APP_DATA:-.local/data}/ssl/privkey.pem",
 				},
 				ReadHeaderTimeout:   10 * time.Second,
 				ReadTimeout:         0,
