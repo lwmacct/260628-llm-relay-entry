@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/lwmacct/260614-go-pkg-tlsreload/pkg/tlsreload"
 	"github.com/lwmacct/260628-llm-relay-entry/internal/config"
 )
 
@@ -26,6 +27,6 @@ func validateConfig(cfg *config.Config) error {
 	return validateHTTPTLS(cfg.Server.HTTP.TLS)
 }
 
-func validateHTTPTLS(tlsConfig config.ServerHTTPTLS) error {
-	return tlsConfig.TLSReloadConfig().Validate()
+func validateHTTPTLS(tlsConfig tlsreload.Config) error {
+	return tlsConfig.Validate()
 }

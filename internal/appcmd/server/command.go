@@ -54,6 +54,11 @@ func commandFlags() []cli.Flag {
 			Value: defaults.Server.HTTP.TLS.KeyFile,
 		},
 		&cli.DurationFlag{
+			Name:  "http.tls.poll-interval",
+			Usage: usage.MustUsage("http.tls.poll-interval"),
+			Value: defaults.Server.HTTP.TLS.PollInterval,
+		},
+		&cli.DurationFlag{
 			Name:  "http.read-header-timeout",
 			Usage: usage.MustUsage("http.read-header-timeout"),
 			Value: defaults.Server.HTTP.ReadHeaderTimeout,

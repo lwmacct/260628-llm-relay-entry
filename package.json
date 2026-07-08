@@ -1,6 +1,6 @@
 {
   "name": "llm-relay-entry-web",
-  "version": "0.6.260707",
+  "version": "0.7.260708",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.10.0",

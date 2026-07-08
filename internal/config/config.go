@@ -18,30 +18,16 @@ type Server struct {
 }
 
 type ServerHTTP struct {
-	Listen              string        `json:"listen"                desc:"HTTP 服务监听地址"`
-	WebRoot             string        `json:"web-root"              desc:"静态 Web 根目录，留空则不托管前端"`
-	TLS                 ServerHTTPTLS `json:"tls"                   desc:"HTTPS TLS 配置"`
-	ReadHeaderTimeout   time.Duration `json:"read-header-timeout"   desc:"HTTP 请求头读取超时"`
-	ReadTimeout         time.Duration `json:"read-timeout"          desc:"HTTP 请求读取超时；0 表示不限制，适合流式入口"`
-	WriteTimeout        time.Duration `json:"write-timeout"         desc:"HTTP 响应写入超时；0 表示不限制，适合长流式响应"`
-	IdleTimeout         time.Duration `json:"idle-timeout"          desc:"HTTP 空闲连接超时时间"`
-	ShutdownTimeout     time.Duration `json:"shutdown-timeout"      desc:"优雅关闭超时时间"`
-	MaxAPIBodyBytes     int64         `json:"max-api-body-bytes"    desc:"普通 HTTP API 最大请求体字节数，0 表示不限制；Codex relay 入口不使用该限制"`
-	EnableDebugRequests bool          `json:"enable-debug-requests" desc:"调试日志级别下记录请求元数据，不记录 body 和敏感头"`
-}
-
-type ServerHTTPTLS struct {
-	Enabled  bool   `json:"enabled"   desc:"是否启用 HTTPS TLS"`
-	CertFile string `json:"cert-file" desc:"TLS 证书文件路径或 URI"`
-	KeyFile  string `json:"key-file"  desc:"TLS 私钥文件路径或 URI"`
-}
-
-func (cfg ServerHTTPTLS) TLSReloadConfig() tlsreload.Config {
-	return tlsreload.Config{
-		Enabled:  cfg.Enabled,
-		CertFile: cfg.CertFile,
-		KeyFile:  cfg.KeyFile,
-	}
+	Listen              string           `json:"listen"                desc:"HTTP 服务监听地址"`
+	WebRoot             string           `json:"web-root"              desc:"静态 Web 根目录，留空则不托管前端"`
+	TLS                 tlsreload.Config `json:"tls"                   desc:"HTTPS TLS 配置"`
+	ReadHeaderTimeout   time.Duration    `json:"read-header-timeout"   desc:"HTTP 请求头读取超时"`
+	ReadTimeout         time.Duration    `json:"read-timeout"          desc:"HTTP 请求读取超时；0 表示不限制，适合流式入口"`
+	WriteTimeout        time.Duration    `json:"write-timeout"         desc:"HTTP 响应写入超时；0 表示不限制，适合长流式响应"`
+	IdleTimeout         time.Duration    `json:"idle-timeout"          desc:"HTTP 空闲连接超时时间"`
+	ShutdownTimeout     time.Duration    `json:"shutdown-timeout"      desc:"优雅关闭超时时间"`
+	MaxAPIBodyBytes     int64            `json:"max-api-body-bytes"    desc:"普通 HTTP API 最大请求体字节数，0 表示不限制；Codex relay 入口不使用该限制"`
+	EnableDebugRequests bool             `json:"enable-debug-requests" desc:"调试日志级别下记录请求元数据，不记录 body 和敏感头"`
 }
 
 type Adapter struct {
@@ -86,7 +72,7 @@ func DefaultConfig() Config {
 			HTTP: ServerHTTP{
 				Listen:  ":23108",
 				WebRoot: "",
-				TLS: ServerHTTPTLS{
+				TLS: tlsreload.Config{
 					Enabled:  false,
 					CertFile: "${APP_DATA:-.local/data}/ssl/fullchain.pem",
 					KeyFile:  "${APP_DATA:-.local/data}/ssl/privkey.pem",
