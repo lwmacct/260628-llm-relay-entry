@@ -3,7 +3,6 @@ package handler
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/lwmacct/260628-llm-relay-entry/internal/service"
 )
@@ -44,7 +43,6 @@ func (h codexEntryHandler) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	input := service.CodexEntryInput{
-		UserAgent:       strings.TrimSpace(r.UserAgent()),
 		Authorization:   r.Header.Get("Authorization"),
 		SessionID:       utilSessionID(r.Header),
 		RequestID:       requestID,
@@ -52,7 +50,7 @@ func (h codexEntryHandler) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	prepared, err := h.entries.PrepareForward(r.Context(), input)
 	if err != nil {
-		h.logPrepareError(r, requestID, input.UserAgent, err)
+		h.logPrepareError(r, requestID, err)
 		utilWriteError(w, requestID, utilEntryStatus(err), utilEntryMessage(err))
 		return
 	}
@@ -61,14 +59,11 @@ func (h codexEntryHandler) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	h.relay.ServeHTTP(w, r, prepared.Forward)
 }
 
-func (h codexEntryHandler) logPrepareError(r *http.Request, requestID string, userAgent string, err error) {
+func (h codexEntryHandler) logPrepareError(r *http.Request, requestID string, err error) {
 	status := utilEntryStatus(err)
-	switch status {
-	case http.StatusForbidden:
-		utilLogUnsupportedUserAgent(r, requestID, userAgent)
-	case http.StatusBadGateway:
+	if status >= http.StatusInternalServerError {
 		slog.Warn(
-			"Codex entry request failed",
+			"API entry request failed",
 			"request_id", utilSanitizeLogValue(requestID),
 			"method", utilSanitizeLogValue(utilRequestMethod(r)),
 			"path", utilSanitizeLogValue(utilRequestPath(r)),

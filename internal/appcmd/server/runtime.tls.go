@@ -12,8 +12,8 @@ import (
 const httpTLSMinVersion = tls.VersionTLS12
 
 type tlsRuntime struct {
-	config  *tls.Config
-	manager *tlsreload.Manager
+	config *tls.Config
+	store  *tlsreload.Store
 }
 
 func newTLSRuntime(ctx context.Context, cfg tlsreload.Config) (*tlsRuntime, error) {
@@ -21,27 +21,29 @@ func newTLSRuntime(ctx context.Context, cfg tlsreload.Config) (*tlsRuntime, erro
 		return &tlsRuntime{}, nil
 	}
 
-	manager, err := tlsreload.New(ctx, cfg, tlsreload.Options{
-		MinVersion: httpTLSMinVersion,
-		Logger:     slog.Default(),
-		Adapters: []tlsreload.Adapter{
-			op.New(op.Options{}),
-		},
-	})
+	store, err := tlsreload.New(
+		ctx,
+		cfg,
+		tlsreload.WithLogger(slog.Default()),
+		tlsreload.WithAdapters(op.New(op.Options{})),
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &tlsRuntime{
-		config:  manager.TLSConfig(),
-		manager: manager,
+		config: &tls.Config{
+			MinVersion:     httpTLSMinVersion,
+			GetCertificate: store.GetCertificate,
+		},
+		store: store,
 	}, nil
 }
 
 func (rt *tlsRuntime) Close() {
-	if rt == nil || rt.manager == nil {
+	if rt == nil || rt.store == nil {
 		return
 	}
-	rt.manager.Close()
-	rt.manager = nil
+	_ = rt.store.Close()
+	rt.store = nil
 }

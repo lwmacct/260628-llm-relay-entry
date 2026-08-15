@@ -6,12 +6,6 @@
 - Root: `internal`
 - Violations: `0`
 
-## APIs
-
-| Method | Path      | Operation    | Tags | Handler  | Register            | File                                  |
-| ------ | --------- | ------------ | ---- | -------- | ------------------- | ------------------------------------- |
-| `GET`  | `/health` | `get-health` |      | `inline` | `Endpoint.Register` | `internal/handler/x_http.endpoint.go` |
-
 ## Handlers
 
 | Scope         | Handler             | Register             | File                                      | Methods                    |
@@ -26,8 +20,14 @@
 
 ## Stores
 
-No stores found.
+| Scope       | File                                     | Methods                    |
+| ----------- | ---------------------------------------- | -------------------------- |
+| `api_token` | `internal/repository/api_token.store.go` | FetchAPITokenGrantByDigest |
 
 ## Tables
 
 No tables found.
+
+## Projections
+
+No projections found.

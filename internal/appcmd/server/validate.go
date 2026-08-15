@@ -12,21 +12,21 @@ func validateConfig(cfg *config.Config) error {
 	if cfg == nil {
 		return errors.New("config is required")
 	}
-	if strings.TrimSpace(cfg.Server.Adapter.Relay.BaseURL) == "" {
-		return errors.New("adapter.relay.base-url is required")
+	if strings.TrimSpace(cfg.Server.Relay.BaseURL) == "" || !strings.HasPrefix(strings.TrimSpace(cfg.Server.Relay.DirectiveToken), "dp.22.remote.") {
+		return errors.New("relay base URL and fixed dp.22.remote token are required")
 	}
-	if strings.TrimSpace(cfg.Server.Adapter.Runtime.APIBaseURL) == "" {
-		return errors.New("adapter.runtime.api-base-url is required")
+	if strings.TrimSpace(cfg.Server.Token.DigestKeyID) == "" || strings.Contains(cfg.Server.Token.DigestKeyID, "_") || strings.TrimSpace(cfg.Server.Token.DigestKey) == "" {
+		return errors.New("valid token digest settings are required")
 	}
-	if strings.TrimSpace(cfg.Server.Adapter.Runtime.PlanID) == "" {
-		return errors.New("adapter.runtime.plan-id is required")
-	}
-	if cfg.Server.HTTP.ShutdownTimeout <= 0 {
-		return errors.New("http.shutdown-timeout must be greater than zero")
+	if cfg.Server.Database.MaxOpenConns <= 0 || cfg.Server.Database.MaxIdleConns < 0 || cfg.Server.HTTP.ShutdownTimeout <= 0 {
+		return errors.New("database connection limits and HTTP shutdown timeout are invalid")
 	}
 	return validateHTTPTLS(cfg.Server.HTTP.TLS)
 }
 
 func validateHTTPTLS(tlsConfig tlsreload.Config) error {
+	if !tlsConfig.Enabled {
+		return nil
+	}
 	return tlsConfig.Validate()
 }

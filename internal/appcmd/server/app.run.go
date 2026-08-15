@@ -38,7 +38,7 @@ func (app *App) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
 	go func() {
 		httpCfg := app.cfg.Server.HTTP
-		slog.Info("web service starting", "listen", srv.Addr, "https", httpCfg.TLS.Enabled, "web_root", httpCfg.WebRoot)
+		slog.Info("API entry service starting", "listen", srv.Addr, "https", httpCfg.TLS.Enabled)
 		var serveErr error
 		if httpCfg.TLS.Enabled {
 			serveErr = srv.ServeTLS(ln, "", "")
@@ -57,16 +57,17 @@ func (app *App) Run(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		return shutdown(ctx, srv, app.cfg)
+		return shutdown(ctx, srv, rt, app.cfg)
 	case sig := <-sigCh:
 		slog.Info("received shutdown signal", "signal", sig.String())
-		return shutdown(ctx, srv, app.cfg)
+		return shutdown(ctx, srv, rt, app.cfg)
 	case err := <-errCh:
 		return err
 	}
 }
 
-func shutdown(ctx context.Context, srv *http.Server, cfg *config.Config) error {
+func shutdown(ctx context.Context, srv *http.Server, rt *runtimeState, cfg *config.Config) error {
+	rt.MarkNotReady()
 	shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cfg.Server.HTTP.ShutdownTimeout)
 	defer cancel()
 

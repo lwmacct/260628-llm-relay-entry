@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -13,48 +13,35 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
 )
 
 const (
-	responsesPath                 = "/responses"
-	HeaderClientRequestID         = "X-Client-Request-Id"
-	HeaderRuntimeKey              = "M-Runtime-Key"
-	HeaderSessionID               = "Session-Id"
-	HeaderInternalSessionID       = "Session_id"
-	maxLoggedErrorBodyBytes int64 = 256 * 1024
+	HeaderClientRequestID = "X-Client-Request-Id"
+	//nolint:gosec // This is the name of an internal identifier header, not a credential value.
+	HeaderCredentialID     = "X-Relay-Credential-Id"
+	HeaderResolverAffinity = "X-Resolver-Affinity-Key"
+	maxErrorBodyBytes      = 256 * 1024
 )
 
+type errorResponse struct {
+	Error     string `json:"error"`
+	RequestID string `json:"request_id,omitempty"`
+}
+
 type ForwardRequest struct {
-	Payload         CredentialPayload
-	RuntimeKey      string
-	RequestID       string
-	ClientRequestID string
-	ContextID       string
-	PoolID          string
-	ResourceID      string
+	DirectiveToken     string
+	VendorCredentialID string
+	AffinityKey        string
+	RequestID          string
+	ClientRequestID    string
 }
 
 type Proxy struct {
-	proxy          *httputil.ReverseProxy
-	transport      http.RoundTripper
-	responsePolicy ResponsePolicy
+	proxy     *httputil.ReverseProxy
+	transport http.RoundTripper
 }
 
 type forwardRequestContextKey struct{}
-
-type ResponsePolicy interface {
-	HandleRelayResponse(ctx context.Context, resp *http.Response, forward ForwardRequest) *ErrorResponseOverride
-}
-
-type ErrorResponseOverride struct {
-	StatusCode  int
-	Message     string
-	Code        string
-	Retryable   bool
-	RetryReason string
-	RetryAfter  string
-}
 
 type TransportOptions struct {
 	MaxIdleConns        int
@@ -66,16 +53,8 @@ type TransportOptions struct {
 
 type Option func(*Proxy)
 
-func WithResponsePolicy(policy ResponsePolicy) Option {
-	return func(p *Proxy) {
-		p.responsePolicy = policy
-	}
-}
-
 func WithTransport(transport http.RoundTripper) Option {
-	return func(p *Proxy) {
-		p.transport = transport
-	}
+	return func(proxy *Proxy) { proxy.transport = transport }
 }
 
 func NewTransport(opts TransportOptions) http.RoundTripper {
@@ -112,55 +91,38 @@ func NewProxy(baseURL string, options ...Option) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	proxy := &Proxy{}
 	for _, option := range options {
 		if option != nil {
 			option(proxy)
 		}
 	}
+	if proxy.transport == nil {
+		proxy.transport = http.DefaultTransport
+	}
 	proxy.proxy = &httputil.ReverseProxy{
-		// Codex responses can stay open for a long time; flush every forwarded
-		// chunk immediately instead of relying on generic buffered proxy defaults.
 		FlushInterval: -1,
-		Rewrite: func(pr *httputil.ProxyRequest) {
-			rewriteOutboundRequest(pr, targetURL)
-			forward, _ := forwardRequestFromContext(pr.In.Context())
+		Transport:     proxy.transport,
+		Rewrite: func(request *httputil.ProxyRequest) {
+			forward, _ := forwardRequestFromContext(request.In.Context())
+			rewriteOutboundRequest(request, targetURL)
+			request.Out.Header.Set("Authorization", "Bearer "+forward.DirectiveToken)
+			request.Out.Header.Set(HeaderCredentialID, forward.VendorCredentialID)
+			request.Out.Header.Set(HeaderResolverAffinity, forward.AffinityKey)
 			if forward.ClientRequestID != "" {
-				pr.Out.Header.Set(HeaderClientRequestID, forward.ClientRequestID)
+				request.Out.Header.Set(HeaderClientRequestID, forward.ClientRequestID)
 			}
-
-			encodedPayload, err := EncodeCredentialPayload(forward.Payload)
-			if err != nil {
-				pr.Out.Header.Del("Authorization")
-				pr.Out.Header.Del(HeaderRuntimeKey)
-				return
-			}
-
-			pr.Out.Header.Set("Authorization", "Bearer "+encodedPayload)
-			if forward.RuntimeKey != "" {
-				pr.Out.Header.Set(HeaderRuntimeKey, forward.RuntimeKey)
-			} else {
-				pr.Out.Header.Del(HeaderRuntimeKey)
-			}
-			pr.Out.Header.Del("X-Proxy-Directive")
-			pr.Out.Header.Del(HeaderSessionID)
-			pr.Out.Header.Del(HeaderInternalSessionID)
 		},
-		ModifyResponse: func(resp *http.Response) error {
-			logTargetResponseSummary(resp)
-			var override *ErrorResponseOverride
-			if forward, ok := forwardRequestFromContext(resp.Request.Context()); ok && proxy.responsePolicy != nil {
-				override = proxy.responsePolicy.HandleRelayResponse(resp.Request.Context(), resp, forward)
+		ModifyResponse: func(response *http.Response) error {
+			if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+				suppressErrorResponse(response)
 			}
-			logAndSuppressNon2xxResponseBody(resp, override)
 			return nil
 		},
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
-			logProxyFailure(r, err)
-			writeError(w, requestIDFromContext(r.Context()), http.StatusBadGateway, "relay: proxy request failed")
+			slog.Warn("Directive proxy request failed", "request_id", requestIDFromContext(r.Context()), "error", err.Error())
+			writeError(w, requestIDFromContext(r.Context()), http.StatusBadGateway, "relay request failed")
 		},
-		Transport: proxy.transport,
 	}
 	return proxy, nil
 }
@@ -174,145 +136,67 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request, forward Forwar
 	p.proxy.ServeHTTP(w, r.WithContext(ctx))
 }
 
+func (p *Proxy) CloseIdleConnections() {
+	if closer, ok := p.transport.(interface{ CloseIdleConnections() }); ok {
+		closer.CloseIdleConnections()
+	}
+}
+
+func rewriteOutboundRequest(request *httputil.ProxyRequest, target *url.URL) {
+	request.Out.URL.Scheme = target.Scheme
+	request.Out.URL.Host = target.Host
+	request.Out.URL.Path = joinURLPath(target.Path, request.In.URL.Path)
+	request.Out.URL.RawPath = ""
+	request.Out.URL.RawQuery = request.In.URL.RawQuery
+	request.Out.Host = ""
+	stripUntrustedHeaders(request.Out.Header)
+}
+
+func stripUntrustedHeaders(header http.Header) {
+	for key := range header {
+		lower := strings.ToLower(strings.TrimSpace(key))
+		if lower == "authorization" || lower == "proxy-authorization" || lower == "cookie" || lower == "cookie2" ||
+			lower == "x-proxy-directive" || lower == "m-runtime-key" || lower == "session-id" || lower == "session_id" ||
+			lower == strings.ToLower(HeaderCredentialID) || lower == strings.ToLower(HeaderResolverAffinity) ||
+			strings.HasPrefix(lower, "x-dp-") || strings.HasPrefix(lower, "cf-") || strings.HasPrefix(lower, "x-forwarded-") ||
+			lower == "forwarded" || lower == "via" || lower == "x-real-ip" || lower == "true-client-ip" || lower == "cdn-loop" {
+			header.Del(key)
+		}
+	}
+}
+
+func suppressErrorResponse(response *http.Response) {
+	if response.Body != nil {
+		raw, _ := io.ReadAll(io.LimitReader(response.Body, maxErrorBodyBytes))
+		_ = response.Body.Close()
+		slog.Warn("Directive proxy returned non-success", "status", response.StatusCode, "body_bytes", len(raw))
+	}
+	body, err := json.Marshal(errorResponse{Error: "relay request failed"})
+	if err != nil {
+		body = []byte(`{"error":"relay request failed"}`)
+	}
+	body = append(body, '\n')
+	response.Body = io.NopCloser(bytes.NewReader(body))
+	response.ContentLength = int64(len(body))
+	response.Header = make(http.Header)
+	response.Header.Set("Content-Type", "application/json")
+	response.Header.Set("Content-Length", strconv.Itoa(len(body)))
+}
+
 func forwardRequestFromContext(ctx context.Context) (ForwardRequest, bool) {
 	forward, ok := ctx.Value(forwardRequestContextKey{}).(ForwardRequest)
 	return forward, ok
 }
 
 func requestIDFromContext(ctx context.Context) string {
-	forward, ok := forwardRequestFromContext(ctx)
-	if !ok {
-		return ""
-	}
+	forward, _ := forwardRequestFromContext(ctx)
 	return strings.TrimSpace(forward.RequestID)
 }
 
-func rewriteOutboundRequest(pr *httputil.ProxyRequest, targetURL *url.URL) {
-	pr.Out.URL.Scheme = targetURL.Scheme
-	pr.Out.URL.Host = targetURL.Host
-	pr.Out.URL.Path = joinURLPath(targetURL.Path, responsesPath)
-	pr.Out.URL.RawPath = ""
-	pr.Out.URL.RawQuery = pr.In.URL.RawQuery
-	pr.Out.URL.ForceQuery = pr.In.URL.ForceQuery
-	pr.Out.Host = ""
-	stripEdgeProxyHeaders(pr.Out.Header)
-}
-
-func stripEdgeProxyHeaders(header http.Header) {
-	for key := range header {
-		if isEdgeProxyHeader(key) {
-			header.Del(key)
-		}
-	}
-}
-
-func isEdgeProxyHeader(key string) bool {
-	lowerKey := strings.ToLower(strings.TrimSpace(key))
-	switch {
-	case strings.HasPrefix(lowerKey, "cf-"):
-		return true
-	case strings.HasPrefix(lowerKey, "x-forwarded-"):
-		return true
-	default:
-		switch lowerKey {
-		case "cdn-loop", "true-client-ip", "forwarded", "via", "x-real-ip":
-			return true
-		default:
-			return false
-		}
-	}
-}
-
-func logAndSuppressNon2xxResponseBody(resp *http.Response, override *ErrorResponseOverride) {
-	if resp == nil || isSuccessStatus(resp.StatusCode) {
-		return
-	}
-
-	if override != nil && override.StatusCode > 0 {
-		resp.StatusCode = override.StatusCode
-		resp.Status = safeHTTPStatus(override.StatusCode)
-	}
-	retryAfter := resp.Header.Get("Retry-After")
-	if override != nil && strings.TrimSpace(override.RetryAfter) != "" {
-		retryAfter = strings.TrimSpace(override.RetryAfter)
-	}
-	var body string
-	if resp.Body != nil {
-		raw, err := io.ReadAll(io.LimitReader(resp.Body, maxLoggedErrorBodyBytes))
-		if err != nil {
-			body = "body read failed: " + err.Error()
-		} else {
-			body = string(raw)
-		}
-		_ = resp.Body.Close()
-	}
-
-	logTargetNonOKResponse(resp, body)
-
-	rawErrorBody, err := json.Marshal(suppressedErrorBody(resp, override))
-	if err != nil {
-		rawErrorBody = []byte(`{"error":"relay: non-2xx response"}`)
-	}
-	rawErrorBody = append(rawErrorBody, '\n')
-
-	resp.Body = io.NopCloser(bytes.NewReader(rawErrorBody))
-	resp.ContentLength = int64(len(rawErrorBody))
-	resp.Header = make(http.Header)
-	resp.Header.Set("Content-Type", "application/json")
-	resp.Header.Set("Content-Length", strconv.Itoa(len(rawErrorBody)))
-	if retryAfter != "" {
-		resp.Header.Set("Retry-After", retryAfter)
-	}
-}
-
-func isSuccessStatus(statusCode int) bool {
-	return statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices
-}
-
-func suppressedErrorBody(resp *http.Response, override *ErrorResponseOverride) map[string]any {
-	body := map[string]any{
-		"error": "relay: non-2xx response",
-	}
-	if requestID := requestIDFromContext(resp.Request.Context()); requestID != "" {
-		body["request_id"] = requestID
-	}
-	if override == nil {
-		return body
-	}
-	message := strings.TrimSpace(override.Message)
-	code := strings.TrimSpace(override.Code)
-	retryReason := strings.TrimSpace(override.RetryReason)
-	if message == "" && code == "" && !override.Retryable && retryReason == "" {
-		return body
-	}
-	if message == "" {
-		message = "relay: non-2xx response"
-	}
-	if retryReason == "" {
-		retryReason = "adapter_retryable"
-	}
-	errorBody := map[string]any{
-		"message": message,
-	}
-	if code != "" {
-		errorBody["code"] = code
-	}
-	if override.Retryable {
-		errorBody["retryable"] = true
-		errorBody["retry_reason"] = retryReason
-	}
-	body["error"] = errorBody
-	return body
-}
-
 func writeError(w http.ResponseWriter, requestID string, statusCode int, message string) {
-	body := map[string]any{"error": message}
-	if requestID != "" {
-		body["request_id"] = requestID
-	}
-	raw, err := json.Marshal(body)
+	raw, err := json.Marshal(errorResponse{Error: message, RequestID: requestID})
 	if err != nil {
-		raw = []byte(`{"error":"adapter: internal error"}`)
+		raw = []byte(`{"error":"relay request failed"}`)
 	}
 	raw = append(raw, '\n')
 	w.Header().Set("Content-Type", "application/json")
@@ -321,114 +205,14 @@ func writeError(w http.ResponseWriter, requestID string, statusCode int, message
 	_, _ = w.Write(raw)
 }
 
-func logProxyFailure(r *http.Request, err error) {
-	slog.Warn(
-		sanitizeLogValue("Relay request failed"),
-		"request_id", sanitizeLogValue(requestIDFromContext(r.Context())),
-		"method", sanitizeLogValue(requestMethod(r)),
-		"path", sanitizeLogValue(requestPath(r)),
-		"error", sanitizeLogValue(errorString(err)),
-	)
-}
-
-func logTargetNonOKResponse(resp *http.Response, body string) {
-	req := resp.Request
-	slog.Warn(
-		sanitizeLogValue("Relay returned non-2xx response"),
-		"request_id", sanitizeLogValue(requestIDFromContext(req.Context())),
-		"status", sanitizeLogValue(safeHTTPStatus(resp.StatusCode)),
-		"method", sanitizeLogValue(requestMethod(req)),
-		"path", sanitizeLogValue(requestPath(req)),
-		"body", sanitizeLogValue(body),
-	)
-}
-
-func logTargetResponseSummary(resp *http.Response) {
-	if resp == nil || resp.Request == nil {
-		return
-	}
-	req := resp.Request
-	slog.Debug(
-		sanitizeLogValue("Relay response received"),
-		"request_id", sanitizeLogValue(requestIDFromContext(req.Context())),
-		"status", sanitizeLogValue(safeHTTPStatus(resp.StatusCode)),
-		"method", sanitizeLogValue(requestMethod(req)),
-		"path", sanitizeLogValue(requestPath(req)),
-		"content_type", sanitizeLogValue(resp.Header.Get("Content-Type")),
-		"content_length", sanitizeLogValue(strconv.FormatInt(resp.ContentLength, 10)),
-	)
-}
-
-func safeHTTPStatus(statusCode int) string {
-	statusText := http.StatusText(statusCode)
-	if statusText == "" {
-		return strconv.Itoa(statusCode)
-	}
-	return fmt.Sprintf("%d %s", statusCode, statusText)
-}
-
-func requestMethod(r *http.Request) string {
-	if r == nil {
-		return ""
-	}
-	return r.Method
-}
-
-func requestPath(r *http.Request) string {
-	if r == nil || r.URL == nil {
-		return ""
-	}
-	return r.URL.Path
-}
-
-func errorString(err error) string {
-	if err == nil {
-		return ""
-	}
-	return err.Error()
-}
-
-func sanitizeLogValue(value string) string {
-	if value == "" {
-		return ""
-	}
-	return strings.Map(func(r rune) rune {
-		switch {
-		case r == '\n', r == '\r':
-			return ' '
-		case unicode.IsControl(r):
-			return -1
-		default:
-			return r
-		}
-	}, value)
-}
-
-func joinURLPath(prefix string, suffix string) string {
-	switch {
-	case prefix == "":
-		if suffix == "" {
-			return "/"
-		}
-		return suffix
-	case suffix == "", suffix == "/":
-		return prefix
-	case strings.HasSuffix(prefix, "/") && strings.HasPrefix(suffix, "/"):
-		return prefix + suffix[1:]
-	case !strings.HasSuffix(prefix, "/") && !strings.HasPrefix(suffix, "/"):
-		return prefix + "/" + suffix
-	default:
-		return prefix + suffix
-	}
-}
-
 func parseAbsoluteURL(raw string) (*url.URL, error) {
 	parsed, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil {
-		return nil, err
-	}
-	if parsed.Scheme == "" || parsed.Host == "" {
-		return nil, fmt.Errorf("url must include scheme and host: %q", raw)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return nil, errors.New("invalid relay base URL")
 	}
 	return parsed, nil
+}
+
+func joinURLPath(prefix, suffix string) string {
+	return strings.TrimRight(prefix, "/") + "/" + strings.TrimLeft(suffix, "/")
 }

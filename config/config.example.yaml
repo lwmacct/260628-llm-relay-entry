@@ -8,51 +8,49 @@ server:
   # HTTP 服务配置
   http:
     listen: ":23108" # HTTP 服务监听地址
-    web-root: "" # 静态 Web 根目录，留空则不托管前端
 
     # HTTPS TLS 配置
     tls:
-      enabled: false # 是否启用 HTTPS TLS
-      cert-file: "${APP_DATA:-.local/data}/ssl/fullchain.pem" # TLS 证书文件路径或 URI
-      key-file: "${APP_DATA:-.local/data}/ssl/privkey.pem" # TLS 私钥文件路径或 URI
-      poll-interval: 0s # TLS 证书文件重载兜底轮询间隔，未配置时使用默认间隔
+      enabled: false # 是否在调用方中启用 TLS 证书热重载
+
+      # TLS 证书来源列表
+      certificates:
+        - id: "default" # 证书的稳定标识
+          certificate: "${APP_DATA:-.local/data}/ssl/fullchain.pem" # TLS 证书路径或 URI
+          private-key: "${APP_DATA:-.local/data}/ssl/privkey.pem" # TLS 私钥路径或 URI
+      default-certificate: "default" # 未匹配 SNI 时使用的证书 ID
+      poll-interval: 5m0s # 证书来源兜底轮询间隔
+      retry-interval: 2s # 证书重载失败后的重试间隔
+      poll-jitter-ratio: 0.1 # 成功轮询后的向下随机抖动比例
+      allow-insecure-http: false # 允许通过明文 HTTP 读取证书材料
     read-header-timeout: 10s # HTTP 请求头读取超时
     read-timeout: 0s # HTTP 请求读取超时；0 表示不限制，适合流式入口
     write-timeout: 0s # HTTP 响应写入超时；0 表示不限制，适合长流式响应
     idle-timeout: 1m0s # HTTP 空闲连接超时时间
-    shutdown-timeout: 15s # 优雅关闭超时时间
-    max-api-body-bytes: 1048576 # 普通 HTTP API 最大请求体字节数，0 表示不限制；Codex relay 入口不使用该限制
-    enable-debug-requests: true # 调试日志级别下记录请求元数据，不记录 body 和敏感头
+    shutdown-timeout: 15s # 优雅关闭并等待流式请求完成的最长时间
+    enable-debug-requests: true # 调试级别记录请求元数据，不记录 body 和敏感头
 
-  # Codex relay entry 适配配置
-  adapter:
+  # Console PostgreSQL 数据库配置
+  database:
+    host: "${PGHOST}" # PostgreSQL 主机
+    port: "${PGPORT}" # PostgreSQL 端口
+    user: "${PGUSER}" # PostgreSQL 用户名
+    database: "${PGDATABASE}" # PostgreSQL 数据库名
+    password: "${PGPASSWORD}" # PostgreSQL 密码
+    max-open-conns: 32 # PostgreSQL 最大连接数
+    max-idle-conns: 16 # PostgreSQL 最大空闲连接数
 
-    # 下游 relay 配置
-    relay:
-      base-url: "${CODING_ADAPTER_RELAY_BASE_URL:-http://localhost:40174}" # 下游 relay base URL
-      max-idle-conns: 4096 # 下游 relay 全局空闲连接池容量；只影响连接复用，不限制活跃并发
-      max-idle-conns-per-host: 2048 # 下游 relay 单 host 空闲连接池容量；只影响连接复用，不限制活跃并发
-      max-conns-per-host: 0 # 下游 relay 单 host 活跃连接上限；0 表示不限制
-      idle-conn-timeout: 1m0s # 下游 relay 空闲连接在连接池中的保留时间
-      disable-keep-alives: false # 是否禁用下游 relay keep-alive
-      rate-limit-cooldown-ttl: 5m0s # Relay 返回 429 后向 runtime 上报的资源冷却时间
-      rate-limit-retry-after: 2s # Relay 返回 429 后返回客户端的 Retry-After
+  # Directive Proxy 数据面配置
+  relay:
+    base-url: "${DIRECTIVE_PROXY_BASE_URL:-http://localhost:23198}" # Directive Proxy HTTP 基址
+    directive-token: "${DIRECTIVE_REMOTE_TOKEN:?fixed dp.22.remote token is required}" # 固定 dp.22.remote Token，仅在 Entry 到 Directive Proxy 之间使用
+    max-idle-conns: 4096 # 下游全局空闲连接池容量
+    max-idle-conns-per-host: 2048 # 下游单主机空闲连接池容量
+    max-conns-per-host: 0 # 下游单主机活跃连接上限；0 表示不限制
+    idle-conn-timeout: 1m0s # 下游空闲连接保留时间
+    disable-keep-alives: false # 是否禁用下游 keep-alive
 
-    # context-chain Runtime 配置
-    runtime:
-      api-base-url: "${CONTEXT_CHAINS_API_BASE_URL:-http://localhost:40173}" # context-chain Runtime HTTP API base URL
-      auth-token: "${CONTEXT_CHAINS_HTTP_TOKEN:-lwmacct}" # Runtime HTTP API Bearer token，为空则不发送
-      plan-id: "${CONTEXT_CHAINS_PLAN_ID:-default}" # Runtime resolve 使用的 plan_id
-      resolve-timeout: 10s # Runtime resolve HTTP 超时
-      report-timeout: 2s # Runtime report HTTP 超时
-      allow-partial-failover: false # 是否允许 Runtime 部分失败降级返回
-
-  # 入口 token 鉴权配置
-  token-auth:
-
-    # 基于 Redis Bloom Filter 的 token 鉴权配置
-    redis-bloom:
-      enabled: true # 是否启用 Redis Bloom Filter token 鉴权
-      url: "${REDIS_URL:-redis://localhost:6379/0}" # Redis URL，支持 REDIS_URL 环境变量
-      password: "${REDISCLI_AUTH}" # Redis 密码，支持 REDISCLI_AUTH 环境变量
-      key-prefix: "token:white" # Redis key 前缀
+  # Relay API Token 摘要配置
+  token:
+    digest-key-id: "v1" # Token 摘要密钥版本，不得包含下划线
+    digest-key: "${RELAY_TOKEN_DIGEST_KEY:?relay token digest key is required}" # Token HMAC-SHA256 摘要密钥，必须与 Console 一致

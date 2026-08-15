@@ -1,7 +1,10 @@
 package relay
 
 import (
+	"io"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -43,6 +46,56 @@ func TestNewTransportUsesConfiguredConnectionPool(t *testing.T) {
 	if !transport.DisableKeepAlives {
 		t.Fatal("expected keep-alives to be disabled")
 	}
+}
+
+func TestProxyRebuildsTrustedDirectiveHeaders(t *testing.T) {
+	transport := &captureTransport{}
+	proxy, err := NewProxy("https://directive.internal/base", WithTransport(transport))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "https://entry.example/v1/responses?stream=true", strings.NewReader("request"))
+	request.Header.Set("Authorization", "Bearer user-token")
+	request.Header.Set("Cookie", "session=secret")
+	request.Header.Set(HeaderCredentialID, "spoofed")
+	request.Header.Set(HeaderResolverAffinity, "spoofed")
+	request.Header.Set("X-Dp-Internal", "spoofed")
+	request.Header.Set("X-Forwarded-For", "198.51.100.10")
+	response := httptest.NewRecorder()
+	//nolint:gosec // These are deliberately invalid test-only credential values.
+	proxy.ServeHTTP(response, request, ForwardRequest{
+		DirectiveToken: "dp.22.remote.payload.signature", VendorCredentialID: "credential-id",
+		AffinityKey: "affinity-key", ClientRequestID: "request-id",
+	})
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	got := transport.request
+	if got == nil || got.URL.String() != "https://directive.internal/base/v1/responses?stream=true" {
+		t.Fatalf("unexpected target request: %#v", got)
+	}
+	if got.Header.Get("Authorization") != "Bearer dp.22.remote.payload.signature" || got.Header.Get(HeaderCredentialID) != "credential-id" || got.Header.Get(HeaderResolverAffinity) != "affinity-key" {
+		t.Fatalf("trusted headers were not rebuilt: %v", got.Header)
+	}
+	for _, name := range []string{"Cookie", "X-Dp-Internal", "X-Forwarded-For"} {
+		if got.Header.Get(name) != "" {
+			t.Fatalf("untrusted header %q leaked: %v", name, got.Header)
+		}
+	}
+	if proxy.proxy.FlushInterval != -1 {
+		t.Fatalf("streaming flush interval=%s", proxy.proxy.FlushInterval)
+	}
+}
+
+type captureTransport struct{ request *http.Request }
+
+func (t *captureTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	t.request = request.Clone(request.Context())
+	t.request.Header = request.Header.Clone()
+	return &http.Response{
+		StatusCode: http.StatusOK, Status: "200 OK", Header: make(http.Header),
+		Body: io.NopCloser(strings.NewReader("ok")), ContentLength: 2, Request: request,
+	}, nil
 }
 
 func TestNewProxyUsesConfiguredTransport(t *testing.T) {

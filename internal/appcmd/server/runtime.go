@@ -3,106 +3,90 @@ package server
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+
+	"github.com/uptrace/bun"
 
 	"github.com/lwmacct/260628-llm-relay-entry/internal/config"
+	"github.com/lwmacct/260628-llm-relay-entry/internal/infra/database"
 	"github.com/lwmacct/260628-llm-relay-entry/internal/infra/relay"
-	"github.com/lwmacct/260628-llm-relay-entry/internal/infra/runtime"
-	"github.com/lwmacct/260628-llm-relay-entry/internal/infra/tokenauth"
+	"github.com/lwmacct/260628-llm-relay-entry/internal/repository"
 	"github.com/lwmacct/260628-llm-relay-entry/internal/service"
 )
 
 type runtimeState struct {
-	runtimeClient *runtime.Client
-	resolver      *runtimeCredentialResolver
-	tokenChecker  tokenauth.Checker
-	relayProxy    *relay.Proxy
-	codexEntries  *service.CodexEntryService
-	tls           *tlsRuntime
+	db           *bun.DB
+	relayProxy   *relay.Proxy
+	codexEntries *service.CodexEntryService
+	tls          *tlsRuntime
+	ready        atomic.Bool
 }
 
 func newRuntime(ctx context.Context, cfg *config.Config) (*runtimeState, error) {
-	runtimeClient, err := runtime.NewClient(runtime.Config{
-		BaseURL:        cfg.Server.Adapter.Runtime.APIBaseURL,
-		AuthToken:      cfg.Server.Adapter.Runtime.AuthToken,
-		ResolveTimeout: cfg.Server.Adapter.Runtime.ResolveTimeout,
-		ReportTimeout:  cfg.Server.Adapter.Runtime.ReportTimeout,
+	db, err := database.Open(ctx, cfg.Server.Database)
+	if err != nil {
+		return nil, fmt.Errorf("open token database: %w", err)
+	}
+	entries, err := service.NewCodexEntryService(repository.NewStore(db), service.APIEntrySettings{
+		DigestKeyID:    cfg.Server.Token.DigestKeyID,
+		DigestKey:      cfg.Server.Token.DigestKey,
+		DirectiveToken: cfg.Server.Relay.DirectiveToken,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("configure runtime client: %w", err)
+		_ = db.Close()
+		return nil, fmt.Errorf("configure API entry: %w", err)
 	}
-
-	resolver, err := newRuntimeCredentialResolver(
-		runtimeClient,
-		cfg.Server.Adapter.Runtime.PlanID,
-		cfg.Server.Adapter.Runtime.AllowPartialFailover,
-	)
+	//nolint:contextcheck // Proxy construction does not perform context-bound work.
+	proxy, err := relay.NewProxy(cfg.Server.Relay.BaseURL, relay.WithTransport(relay.NewTransport(relayTransportOptions(cfg.Server.Relay))))
 	if err != nil {
-		return nil, fmt.Errorf("configure runtime resolver: %w", err)
+		_ = db.Close()
+		return nil, fmt.Errorf("configure directive proxy: %w", err)
 	}
-
-	tokenChecker, err := tokenauth.NewChecker(tokenauth.RedisBloomConfig{
-		Enabled:   cfg.Server.TokenAuth.RedisBloom.Enabled,
-		URL:       cfg.Server.TokenAuth.RedisBloom.URL,
-		Password:  cfg.Server.TokenAuth.RedisBloom.Password,
-		KeyPrefix: cfg.Server.TokenAuth.RedisBloom.KeyPrefix,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("configure token auth: %w", err)
-	}
-
-	//nolint:contextcheck // Relay callbacks use per-request contexts; the startup context is not applicable here.
-	relayProxy, err := relay.NewProxy(
-		cfg.Server.Adapter.Relay.BaseURL,
-		relay.WithTransport(relay.NewTransport(relayTransportOptions(cfg.Server.Adapter.Relay))),
-		relay.WithResponsePolicy(newRelayRateLimitPolicy(
-			resolver,
-			cfg.Server.Adapter.Relay.RateLimitCooldownTTL,
-			cfg.Server.Adapter.Relay.RateLimitRetryAfter,
-		)),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("configure relay proxy: %w", err)
-	}
-
-	codexEntries := service.NewCodexEntryService(resolver, tokenChecker)
-	rt := &runtimeState{
-		runtimeClient: runtimeClient,
-		resolver:      resolver,
-		tokenChecker:  tokenChecker,
-		relayProxy:    relayProxy,
-		codexEntries:  codexEntries,
-	}
-
+	rt := &runtimeState{db: db, relayProxy: proxy, codexEntries: entries}
 	tlsRuntime, err := newTLSRuntime(ctx, cfg.Server.HTTP.TLS)
 	if err != nil {
 		rt.Close()
-		return nil, fmt.Errorf("configure tls: %w", err)
+		return nil, fmt.Errorf("configure TLS: %w", err)
 	}
 	rt.tls = tlsRuntime
+	rt.ready.Store(true)
 	return rt, nil
+}
+
+func (rt *runtimeState) Ready(ctx context.Context) bool {
+	return rt != nil && rt.ready.Load() && rt.db != nil && rt.db.PingContext(ctx) == nil
+}
+
+func (rt *runtimeState) MarkNotReady() {
+	if rt != nil {
+		rt.ready.Store(false)
+	}
 }
 
 func (rt *runtimeState) Close() {
 	if rt == nil {
 		return
 	}
+	rt.MarkNotReady()
+	if rt.relayProxy != nil {
+		rt.relayProxy.CloseIdleConnections()
+		rt.relayProxy = nil
+	}
 	rt.codexEntries = nil
-	rt.relayProxy = nil
-	rt.tokenChecker = nil
-	rt.resolver = nil
-	rt.runtimeClient = nil
+	if rt.db != nil {
+		_ = rt.db.Close()
+		rt.db = nil
+	}
 	if rt.tls != nil {
 		rt.tls.Close()
 		rt.tls = nil
 	}
 }
 
-func relayTransportOptions(cfg config.AdapterRelay) relay.TransportOptions {
+func relayTransportOptions(cfg config.ServerRelay) relay.TransportOptions {
 	return relay.TransportOptions{
-		MaxIdleConns:        cfg.MaxIdleConns,
-		MaxIdleConnsPerHost: cfg.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     cfg.MaxConnsPerHost,
-		IdleConnTimeout:     cfg.IdleConnTimeout,
-		DisableKeepAlives:   cfg.DisableKeepAlives,
+		MaxIdleConns: cfg.MaxIdleConns, MaxIdleConnsPerHost: cfg.MaxIdleConnsPerHost,
+		MaxConnsPerHost: cfg.MaxConnsPerHost, IdleConnTimeout: cfg.IdleConnTimeout,
+		DisableKeepAlives: cfg.DisableKeepAlives,
 	}
 }

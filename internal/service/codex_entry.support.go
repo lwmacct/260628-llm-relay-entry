@@ -2,11 +2,16 @@ package service
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"errors"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/lwmacct/260628-llm-relay-entry/internal/infra/relay"
+	"github.com/lwmacct/260628-llm-relay-entry/internal/repository"
 )
 
 const (
@@ -16,13 +21,7 @@ const (
 	CodexHeaderInternalSessionID = "Session_id"
 )
 
-var (
-	ErrMissingRuntimeBaseURL = errors.New("runtime api base url is required")
-	ErrMissingPlanID         = errors.New("plan id is required")
-)
-
 type CodexEntryInput struct {
-	UserAgent       string
 	Authorization   string
 	SessionID       string
 	RequestID       string
@@ -35,19 +34,20 @@ type CodexPreparedForward struct {
 }
 
 type CodexResolvedCredential struct {
-	Payload       relay.CredentialPayload
-	ContextID     string
-	PoolID        string
-	ResourceID    string
-	PayloadFields []string
+	APIKeyID           int64
+	UserID             int64
+	BindingID          string
+	VendorCredentialID string
 }
 
-type CodexCredentialResolver interface {
-	ResolveCredential(ctx context.Context, key string, sessionID string, clientRequestID string) (CodexResolvedCredential, error)
+type APITokenGrantResolver interface {
+	FetchAPITokenGrantByDigest(context.Context, repository.APITokenDigest) (*repository.APITokenGrant, error)
 }
 
-type CodexResourceReporter interface {
-	ReportResourceCooldown(ctx context.Context, contextID string, reasonCode string, cooldownTTL time.Duration, clientRequestID string) error
+type APIEntrySettings struct {
+	DigestKeyID    string
+	DigestKey      string
+	DirectiveToken string
 }
 
 type CodexEntryError struct {
@@ -60,34 +60,44 @@ func (e *CodexEntryError) Error() string {
 	if e == nil {
 		return ""
 	}
-	if e.Err == nil {
-		return e.Message
+	if e.Err != nil {
+		return e.Err.Error()
 	}
-	return e.Err.Error()
+	return e.Message
 }
 
-func (e *CodexEntryError) Unwrap() error {
-	if e == nil {
-		return nil
-	}
-	return e.Err
-}
+func (e *CodexEntryError) Unwrap() error { return e.Err }
 
-func IsCodexUserAgent(userAgent string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(userAgent))
-	return normalized == "codex" ||
-		strings.HasPrefix(normalized, "codex/") ||
-		strings.HasPrefix(normalized, "codex-")
-}
+var ErrAPIEntryInvalidSettings = errors.New("invalid API entry settings")
 
-func utilBearerToken(header string) string {
-	header = strings.TrimSpace(header)
-	if header == "" {
-		return ""
-	}
-	token, ok := strings.CutPrefix(header, "Bearer ")
-	if !ok {
+type apiEntryClock func() time.Time
+
+func utilBearerToken(value string) string {
+	scheme, token, found := strings.Cut(strings.TrimSpace(value), " ")
+	if !found || !strings.EqualFold(scheme, "Bearer") {
 		return ""
 	}
 	return strings.TrimSpace(token)
+}
+
+func utilValidAPIToken(token, digestKeyID string) bool {
+	prefix := "llmr_" + digestKeyID + "_"
+	encoded, found := strings.CutPrefix(token, prefix)
+	if !found {
+		return false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(encoded)
+	return err == nil && len(raw) == 32
+}
+
+func utilAPITokenDigest(secret, token string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(token))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func utilAPIAffinityKey(secret string, apiKeyID int64, sessionID string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte("affinity\x00" + strconv.FormatInt(apiKeyID, 10) + "\x00" + strings.TrimSpace(sessionID)))
+	return "a1_" + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }

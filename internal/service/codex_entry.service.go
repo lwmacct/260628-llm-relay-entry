@@ -2,81 +2,57 @@ package service
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/lwmacct/260628-llm-relay-entry/internal/infra/relay"
-	"github.com/lwmacct/260628-llm-relay-entry/internal/infra/tokenauth"
+	"github.com/lwmacct/260628-llm-relay-entry/internal/repository"
 )
 
 type CodexEntryService struct {
-	resolver     CodexCredentialResolver
-	tokenChecker tokenauth.Checker
+	grants         APITokenGrantResolver
+	digestKeyID    string
+	digestKey      string
+	directiveToken string
+	now            apiEntryClock
 }
 
-func NewCodexEntryService(resolver CodexCredentialResolver, tokenChecker tokenauth.Checker) *CodexEntryService {
-	if tokenChecker == nil {
-		tokenChecker = tokenauth.NoopChecker{}
+func NewCodexEntryService(grants APITokenGrantResolver, settings APIEntrySettings) (*CodexEntryService, error) {
+	settings.DigestKeyID = strings.TrimSpace(settings.DigestKeyID)
+	settings.DigestKey = strings.TrimSpace(settings.DigestKey)
+	settings.DirectiveToken = strings.TrimSpace(settings.DirectiveToken)
+	if grants == nil || settings.DigestKeyID == "" || strings.Contains(settings.DigestKeyID, "_") || settings.DigestKey == "" || !strings.HasPrefix(settings.DirectiveToken, "dp.22.remote.") {
+		return nil, ErrAPIEntryInvalidSettings
 	}
 	return &CodexEntryService{
-		resolver:     resolver,
-		tokenChecker: tokenChecker,
-	}
+		grants: grants, digestKeyID: settings.DigestKeyID, digestKey: settings.DigestKey,
+		directiveToken: settings.DirectiveToken, now: func() time.Time { return time.Now().UTC() },
+	}, nil
 }
 
 func (s *CodexEntryService) PrepareForward(ctx context.Context, input CodexEntryInput) (CodexPreparedForward, error) {
-	if s == nil || s.resolver == nil {
-		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusNotFound, Message: "adapter: unavailable"}
+	token := utilBearerToken(input.Authorization)
+	if !utilValidAPIToken(token, s.digestKeyID) {
+		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusUnauthorized, Message: "invalid or unavailable API token"}
 	}
-
-	if !IsCodexUserAgent(input.UserAgent) {
-		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusForbidden, Message: "adapter: unsupported user agent"}
+	digest := utilAPITokenDigest(s.digestKey, token)
+	grant, err := s.grants.FetchAPITokenGrantByDigest(ctx, repository.APITokenDigest{DigestKeyID: s.digestKeyID, TokenDigest: digest, At: s.now()})
+	if errors.Is(err, repository.ErrAPITokenNotFound) {
+		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusUnauthorized, Message: "invalid or unavailable API token"}
 	}
-
-	rawToken := utilBearerToken(input.Authorization)
-	if rawToken == "" {
-		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusUnauthorized, Message: "adapter: missing bearer token"}
-	}
-
-	tokenAllowed, err := s.tokenChecker.CheckToken(ctx, rawToken)
 	if err != nil {
-		return CodexPreparedForward{}, &CodexEntryError{
-			StatusCode: http.StatusBadGateway,
-			Message:    "adapter: token authorization check failed",
-			Err:        fmt.Errorf("token authorization check failed: %w", err),
-		}
+		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusServiceUnavailable, Message: "API entry is temporarily unavailable", Err: err}
 	}
-	if !tokenAllowed {
-		return CodexPreparedForward{}, &CodexEntryError{
-			StatusCode: http.StatusUnauthorized,
-			Message:    "adapter: access denied; key is invalid, unavailable, or quota is exhausted",
-		}
+	resolved := CodexResolvedCredential{
+		APIKeyID: grant.APIKeyID, UserID: grant.UserID, BindingID: grant.BindingID, VendorCredentialID: grant.VendorCredentialID,
 	}
-
-	sessionID := strings.TrimSpace(input.SessionID)
-	if sessionID == "" {
-		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusBadRequest, Message: "adapter: missing session-id"}
-	}
-
-	resolved, err := s.resolver.ResolveCredential(ctx, rawToken, sessionID, input.ClientRequestID)
-	if err != nil {
-		return CodexPreparedForward{}, &CodexEntryError{
-			StatusCode: http.StatusBadGateway,
-			Message:    "runtime: resolve credential failed",
-			Err:        fmt.Errorf("resolve credential failed: %w", err),
-		}
-	}
-
 	return CodexPreparedForward{
 		Forward: relay.ForwardRequest{
-			Payload:         resolved.Payload,
-			RuntimeKey:      rawToken,
-			RequestID:       input.RequestID,
-			ClientRequestID: input.ClientRequestID,
-			ContextID:       resolved.ContextID,
-			PoolID:          resolved.PoolID,
-			ResourceID:      resolved.ResourceID,
+			DirectiveToken: s.directiveToken, VendorCredentialID: grant.VendorCredentialID,
+			AffinityKey: utilAPIAffinityKey(s.digestKey, grant.APIKeyID, input.SessionID),
+			RequestID:   input.RequestID, ClientRequestID: input.ClientRequestID,
 		},
 		Resolved: resolved,
 	}, nil
