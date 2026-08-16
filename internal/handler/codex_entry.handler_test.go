@@ -23,7 +23,7 @@ func TestCodexEntryAuthorizesAndForwardsResponses(t *testing.T) {
 	}}
 	//nolint:gosec // The values are deliberately invalid test-only credentials.
 	entries, err := service.NewCodexEntryService(grants, service.APIEntrySettings{
-		DigestKeyID: "v1", DigestKey: "test-digest-key", DirectiveToken: "dp.22.remote.payload.signature",
+		DirectiveToken: "dp.22.remote.payload.signature",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -40,8 +40,8 @@ func TestCodexEntryAuthorizesAndForwardsResponses(t *testing.T) {
 	if response.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
-	if grants.received.DigestKeyID != "v1" || grants.received.TokenDigest == "" {
-		t.Fatalf("unexpected digest lookup: %#v", grants.received)
+	if grants.received.Token != token {
+		t.Fatalf("unexpected token lookup: %#v", grants.received)
 	}
 	if forwarder.forward.DirectiveToken != "dp.22.remote.payload.signature" || forwarder.forward.VendorCredentialID != grants.grant.VendorCredentialID || !strings.HasPrefix(forwarder.forward.AffinityKey, "a1_") {
 		t.Fatalf("unexpected forward: %#v", forwarder.forward)
@@ -62,7 +62,7 @@ func TestCodexEntryRejectsInvalidOrUnavailableToken(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			//nolint:gosec // The values are deliberately invalid test-only credentials.
 			entries, err := service.NewCodexEntryService(&stubGrantResolver{err: test.lookup}, service.APIEntrySettings{
-				DigestKeyID: "v1", DigestKey: "test-digest-key", DirectiveToken: "dp.22.remote.payload.signature",
+				DirectiveToken: "dp.22.remote.payload.signature",
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -83,7 +83,7 @@ func TestCodexEntryRejectsInvalidOrUnavailableToken(t *testing.T) {
 func TestCodexEntryReturnsServiceUnavailableForDatabaseFailure(t *testing.T) {
 	//nolint:gosec // The values are deliberately invalid test-only credentials.
 	entries, err := service.NewCodexEntryService(&stubGrantResolver{err: errors.New("database unavailable")}, service.APIEntrySettings{
-		DigestKeyID: "v1", DigestKey: "test-digest-key", DirectiveToken: "dp.22.remote.payload.signature",
+		DirectiveToken: "dp.22.remote.payload.signature",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -100,17 +100,17 @@ func TestCodexEntryReturnsServiceUnavailableForDatabaseFailure(t *testing.T) {
 }
 
 func testAPIToken() string {
-	return "llmr_v1_" + base64.RawURLEncoding.EncodeToString([]byte(strings.Repeat("\xff", 32)))
+	return "llmr_" + base64.RawURLEncoding.EncodeToString([]byte(strings.Repeat("\xff", 32)))
 }
 
 type stubGrantResolver struct {
 	grant    repository.APITokenGrant
 	err      error
-	received repository.APITokenDigest
+	received repository.APITokenLookup
 }
 
-func (s *stubGrantResolver) FetchAPITokenGrantByDigest(_ context.Context, digest repository.APITokenDigest) (*repository.APITokenGrant, error) {
-	s.received = digest
+func (s *stubGrantResolver) FetchAPITokenGrant(_ context.Context, lookup repository.APITokenLookup) (*repository.APITokenGrant, error) {
+	s.received = lookup
 	if s.err != nil {
 		return nil, s.err
 	}

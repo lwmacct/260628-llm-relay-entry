@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-func (s *Store) FetchAPITokenGrantByDigest(ctx context.Context, digest APITokenDigest) (*APITokenGrant, error) {
+func (s *Store) FetchAPITokenGrant(ctx context.Context, lookup APITokenLookup) (*APITokenGrant, error) {
 	row := new(APITokenGrant)
 	err := s.db.NewSelect().
 		TableExpr("api_keys AS ak").
@@ -17,11 +17,10 @@ func (s *Store) FetchAPITokenGrantByDigest(ctx context.Context, digest APITokenD
 		Join("JOIN users AS u ON u.id = ak.user_id").
 		Join("JOIN relay_bindings AS rb ON rb.id = ak.binding_id").
 		Join("LEFT JOIN api_key_groups AS akg ON akg.id = ak.group_id").
-		Where("ak.digest_key_id = ?", digest.DigestKeyID).
-		Where("ak.token_digest = ?", digest.TokenDigest).
+		Where("ak.token = ?", lookup.Token).
 		Where("ak.status = 'active'").
 		Where("ak.deleted_at IS NULL").
-		Where("ak.expires_at IS NULL OR ak.expires_at > ?", digest.At).
+		Where("ak.expires_at IS NULL OR ak.expires_at > ?", lookup.At).
 		Where("ak.limit_microusd IS NULL OR ak.used_microusd < ak.limit_microusd").
 		Where("u.status = 'active'").
 		Where("rb.status = 'active'").

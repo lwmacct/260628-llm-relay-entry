@@ -20,9 +20,9 @@
 
 ## Stores
 
-| Scope       | File                                     | Methods                    |
-| ----------- | ---------------------------------------- | -------------------------- |
-| `api_token` | `internal/repository/api_token.store.go` | FetchAPITokenGrantByDigest |
+| Scope       | File                                     | Methods            |
+| ----------- | ---------------------------------------- | ------------------ |
+| `api_token` | `internal/repository/api_token.store.go` | FetchAPITokenGrant |
 
 ## Tables
 

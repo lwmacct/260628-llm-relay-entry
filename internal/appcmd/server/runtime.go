@@ -28,8 +28,6 @@ func newRuntime(ctx context.Context, cfg *config.Config) (*runtimeState, error) 
 		return nil, fmt.Errorf("open token database: %w", err)
 	}
 	entries, err := service.NewCodexEntryService(repository.NewStore(db), service.APIEntrySettings{
-		DigestKeyID:    cfg.Server.Token.DigestKeyID,
-		DigestKey:      cfg.Server.Token.DigestKey,
 		DirectiveToken: cfg.Server.Relay.DirectiveToken,
 	})
 	if err != nil {

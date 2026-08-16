@@ -13,32 +13,26 @@ import (
 
 type CodexEntryService struct {
 	grants         APITokenGrantResolver
-	digestKeyID    string
-	digestKey      string
 	directiveToken string
 	now            apiEntryClock
 }
 
 func NewCodexEntryService(grants APITokenGrantResolver, settings APIEntrySettings) (*CodexEntryService, error) {
-	settings.DigestKeyID = strings.TrimSpace(settings.DigestKeyID)
-	settings.DigestKey = strings.TrimSpace(settings.DigestKey)
 	settings.DirectiveToken = strings.TrimSpace(settings.DirectiveToken)
-	if grants == nil || settings.DigestKeyID == "" || strings.Contains(settings.DigestKeyID, "_") || settings.DigestKey == "" || !strings.HasPrefix(settings.DirectiveToken, "dp.22.remote.") {
+	if grants == nil || !strings.HasPrefix(settings.DirectiveToken, "dp.22.remote.") {
 		return nil, ErrAPIEntryInvalidSettings
 	}
 	return &CodexEntryService{
-		grants: grants, digestKeyID: settings.DigestKeyID, digestKey: settings.DigestKey,
-		directiveToken: settings.DirectiveToken, now: func() time.Time { return time.Now().UTC() },
+		grants: grants, directiveToken: settings.DirectiveToken, now: func() time.Time { return time.Now().UTC() },
 	}, nil
 }
 
 func (s *CodexEntryService) PrepareForward(ctx context.Context, input CodexEntryInput) (CodexPreparedForward, error) {
 	token := utilBearerToken(input.Authorization)
-	if !utilValidAPIToken(token, s.digestKeyID) {
+	if !utilValidAPIToken(token) {
 		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusUnauthorized, Message: "invalid or unavailable API token"}
 	}
-	digest := utilAPITokenDigest(s.digestKey, token)
-	grant, err := s.grants.FetchAPITokenGrantByDigest(ctx, repository.APITokenDigest{DigestKeyID: s.digestKeyID, TokenDigest: digest, At: s.now()})
+	grant, err := s.grants.FetchAPITokenGrant(ctx, repository.APITokenLookup{Token: token, At: s.now()})
 	if errors.Is(err, repository.ErrAPITokenNotFound) {
 		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusUnauthorized, Message: "invalid or unavailable API token"}
 	}
@@ -51,7 +45,7 @@ func (s *CodexEntryService) PrepareForward(ctx context.Context, input CodexEntry
 	return CodexPreparedForward{
 		Forward: relay.ForwardRequest{
 			DirectiveToken: s.directiveToken, VendorCredentialID: grant.VendorCredentialID,
-			AffinityKey: utilAPIAffinityKey(s.digestKey, grant.APIKeyID, input.SessionID),
+			AffinityKey: utilAPIAffinityKey(token, grant.APIKeyID, input.SessionID),
 			RequestID:   input.RequestID, ClientRequestID: input.ClientRequestID,
 		},
 		Resolved: resolved,

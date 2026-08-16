@@ -16,7 +16,6 @@ type Server struct {
 	HTTP     ServerHTTP     `json:"http"     desc:"HTTP 服务配置"`
 	Database ServerDatabase `json:"database" desc:"Console PostgreSQL 数据库配置"`
 	Relay    ServerRelay    `json:"relay"    desc:"Directive Proxy 数据面配置"`
-	Token    ServerToken    `json:"token"    desc:"Relay API Token 摘要配置"`
 }
 
 type ServerHTTP struct {
@@ -48,11 +47,6 @@ type ServerRelay struct {
 	MaxConnsPerHost     int           `json:"max-conns-per-host"      desc:"下游单主机活跃连接上限；0 表示不限制"`
 	IdleConnTimeout     time.Duration `json:"idle-conn-timeout"       desc:"下游空闲连接保留时间"`
 	DisableKeepAlives   bool          `json:"disable-keep-alives"     desc:"是否禁用下游 keep-alive"`
-}
-
-type ServerToken struct {
-	DigestKeyID string `json:"digest-key-id" desc:"Token 摘要密钥版本，不得包含下划线"`
-	DigestKey   string `json:"digest-key"    desc:"Token HMAC-SHA256 摘要密钥，必须与 Console 一致"`
 }
 
 func DefaultConfig() Config {
@@ -89,10 +83,6 @@ func DefaultConfig() Config {
 			MaxIdleConns:        4096,
 			MaxIdleConnsPerHost: 2048,
 			IdleConnTimeout:     time.Minute,
-		},
-		Token: ServerToken{
-			DigestKeyID: "v1",
-			DigestKey:   "${RELAY_TOKEN_DIGEST_KEY:?relay token digest key is required}",
 		},
 	}}
 }

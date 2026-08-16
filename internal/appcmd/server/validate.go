@@ -15,9 +15,6 @@ func validateConfig(cfg *config.Config) error {
 	if strings.TrimSpace(cfg.Server.Relay.BaseURL) == "" || !strings.HasPrefix(strings.TrimSpace(cfg.Server.Relay.DirectiveToken), "dp.22.remote.") {
 		return errors.New("relay base URL and fixed dp.22.remote token are required")
 	}
-	if strings.TrimSpace(cfg.Server.Token.DigestKeyID) == "" || strings.Contains(cfg.Server.Token.DigestKeyID, "_") || strings.TrimSpace(cfg.Server.Token.DigestKey) == "" {
-		return errors.New("valid token digest settings are required")
-	}
 	if cfg.Server.Database.MaxOpenConns <= 0 || cfg.Server.Database.MaxIdleConns < 0 || cfg.Server.HTTP.ShutdownTimeout <= 0 {
 		return errors.New("database connection limits and HTTP shutdown timeout are invalid")
 	}

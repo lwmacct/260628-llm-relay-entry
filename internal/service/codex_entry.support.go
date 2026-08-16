@@ -41,12 +41,10 @@ type CodexResolvedCredential struct {
 }
 
 type APITokenGrantResolver interface {
-	FetchAPITokenGrantByDigest(context.Context, repository.APITokenDigest) (*repository.APITokenGrant, error)
+	FetchAPITokenGrant(context.Context, repository.APITokenLookup) (*repository.APITokenGrant, error)
 }
 
 type APIEntrySettings struct {
-	DigestKeyID    string
-	DigestKey      string
 	DirectiveToken string
 }
 
@@ -80,20 +78,13 @@ func utilBearerToken(value string) string {
 	return strings.TrimSpace(token)
 }
 
-func utilValidAPIToken(token, digestKeyID string) bool {
-	prefix := "llmr_" + digestKeyID + "_"
-	encoded, found := strings.CutPrefix(token, prefix)
+func utilValidAPIToken(token string) bool {
+	encoded, found := strings.CutPrefix(token, "llmr_")
 	if !found {
 		return false
 	}
 	raw, err := base64.RawURLEncoding.DecodeString(encoded)
 	return err == nil && len(raw) == 32
-}
-
-func utilAPITokenDigest(secret, token string) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	_, _ = mac.Write([]byte(token))
-	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
 
 func utilAPIAffinityKey(secret string, apiKeyID int64, sessionID string) string {

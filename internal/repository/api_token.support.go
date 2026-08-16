@@ -14,8 +14,7 @@ type APITokenGrant struct {
 	VendorCredentialID string
 }
 
-type APITokenDigest struct {
-	DigestKeyID string
-	TokenDigest string
-	At          time.Time
+type APITokenLookup struct {
+	Token string
+	At    time.Time
 }

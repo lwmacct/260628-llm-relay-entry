@@ -13,7 +13,7 @@ User llmr_ Token
   -> Vendor API
 ```
 
-Entry 对每个请求执行一次按 HMAC 摘要索引的数据库查询，并同时校验 API Key、用户、Binding、Key 分组、过期时间和 Key 限额。数据库只返回 Vendor Route Credential UUID，不返回 Vendor URL、连接池或上游密钥。
+Entry 对每个请求执行一次按完整 Token 索引的数据库查询，并同时校验 API Key、用户、Binding、Key 分组、过期时间和 Key 限额。数据库只返回 Vendor Route Credential UUID，不返回 Vendor URL、连接池或上游密钥。
 
 用户提供的 `Authorization`、Cookie、代理披露头、`X-Dp-*`、`X-Relay-Credential-ID` 和 `X-Resolver-Affinity-Key` 会在出站前删除。Entry 随后写入服务端固定 Remote Token、数据库解析出的 Credential UUID，以及由 Key ID 和可选 `Session-Id` 派生的亲和键。
 
@@ -31,12 +31,11 @@ app remote-token --resolver-url 'http://llm-relay-vendor:23188/api/internal/reso
 
 ## 配置
 
-- `RELAY_TOKEN_DIGEST_KEY`：Console 和 Entry 共享的 Token HMAC 密钥，生产环境必填。
 - `DIRECTIVE_REMOTE_TOKEN`：上一步生成的固定内部 `dp.22.remote` Token。
 - `DIRECTIVE_PROXY_BASE_URL`：directive-proxy 的内部 HTTP 地址。
 - `PGHOST`、`PGPORT`、`PGUSER`、`PGDATABASE`、`PGPASSWORD`：Console PostgreSQL。
 
-Entry 的 PostgreSQL 账号应只拥有 `api_keys`、`users`、`relay_bindings`、`api_key_groups` 的 `SELECT` 权限。Entry 不执行建表或迁移。
+Entry 直接以用户提交的完整 Token 查询 `api_keys.token`。PostgreSQL 账号应只拥有 `api_keys`、`users`、`relay_bindings`、`api_key_groups` 的 `SELECT` 权限；数据库备份和查询日志必须按敏感凭据保护。Entry 不执行建表或迁移。
 
 ## 运维
 

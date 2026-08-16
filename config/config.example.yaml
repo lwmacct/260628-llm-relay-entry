@@ -49,8 +49,3 @@ server:
     max-conns-per-host: 0 # 下游单主机活跃连接上限；0 表示不限制
     idle-conn-timeout: 1m0s # 下游空闲连接保留时间
     disable-keep-alives: false # 是否禁用下游 keep-alive
-
-  # Relay API Token 摘要配置
-  token:
-    digest-key-id: "v1" # Token 摘要密钥版本，不得包含下划线
-    digest-key: "${RELAY_TOKEN_DIGEST_KEY:?relay token digest key is required}" # Token HMAC-SHA256 摘要密钥，必须与 Console 一致
