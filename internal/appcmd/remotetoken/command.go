@@ -12,9 +12,9 @@ import (
 
 var Command = &cli.Command{
 	Name:  "remote-token",
-	Usage: "generate the fixed internal dp.22.remote token",
+	Usage: "generate the fixed Relay dp.22.remote token",
 	Flags: []cli.Flag{
-		&cli.StringFlag{Name: "resolver-url", Usage: "Vendor internal resolver URL", Required: true},
+		&cli.StringFlag{Name: "resolver-url", Usage: "Vendor Relay resolver URL", Required: true},
 	},
 	Action: action,
 }

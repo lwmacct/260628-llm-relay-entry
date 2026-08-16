@@ -9,8 +9,8 @@ import (
 	"testing"
 )
 
-func TestGenerateBuildsInternalHTTPRemoteToken(t *testing.T) {
-	token, err := Generate("directive-secret", "https://vendor.example/api/internal/resolver", "entry-s2s-token")
+func TestGenerateBuildsRelayHTTPRemoteToken(t *testing.T) {
+	token, err := Generate("directive-secret", "https://vendor.example/api/relay/resolver", "entry-s2s-token")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -26,7 +26,7 @@ func TestGenerateBuildsInternalHTTPRemoteToken(t *testing.T) {
 	if err = json.Unmarshal(raw, &spec); err != nil {
 		t.Fatal(err)
 	}
-	if spec.HTTP == nil || spec.HTTP.URL != "https://vendor.example/api/internal/resolver" || spec.HTTP.Headers.Mutations[0].Values[0] != "Bearer entry-s2s-token" {
+	if spec.HTTP == nil || spec.HTTP.URL != "https://vendor.example/api/relay/resolver" || spec.HTTP.Headers.Mutations[0].Values[0] != "Bearer entry-s2s-token" {
 		t.Fatalf("unexpected remote spec: %#v", spec)
 	}
 	mac := hmac.New(sha256.New, []byte("directive-secret"))
