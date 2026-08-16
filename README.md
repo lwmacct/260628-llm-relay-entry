@@ -12,7 +12,7 @@ User llmr_ Token
   -> Entry 查询 Console PostgreSQL
   -> Entry 注入固定 dp.22.remote Token、Credential UUID 和派生亲和键
   -> directive-proxy
-  -> Vendor 共享 listener 的 Relay 路由 /api/relay/resolver
+  -> Vendor 统一 resolver /api/resolver（Relay 认证模式）
   -> Vendor API
 ```
 
@@ -22,17 +22,17 @@ Entry 对每个请求执行一次按完整 Token 索引的数据库查询，并�
 
 这里的 Credential UUID 是 Vendor `RouteCredential.id`。Vendor 创建或轮换凭据时返回的
 `remoteSpec.uuid` 当前与该 ID 相同；Relay Binding 应保存这个 UUID，不保存完整 RemoteSpec 或 `dpr_*`。
-Entry 不验证 `dpr_*`，Vendor Relay resolver 也不要求它。
+Entry 不验证 `dpr_*`，Vendor resolver 的 Relay 模式也不要求它。
 
 ## 固定 Remote Token
 
-固定 Token 的 RemoteSpec 只包含 Vendor Relay resolver URL 和 S2S Bearer，不包含 Route Credential UUID。
-HTTP 调用实际由 directive-proxy 发起；S2S Bearer 在 Vendor 的 Relay 路由上验证。使用下列命令生成：
+固定 Token 的 RemoteSpec 只包含 Vendor resolver URL 和 S2S Bearer，不包含 Route Credential UUID。
+HTTP 调用实际由 directive-proxy 发起；Vendor 用 S2S Bearer 选择 Relay 认证模式。使用下列命令生成：
 
 ```bash
 export DIRECTIVE_TOKEN_SECRET='same-secret-as-directive-proxy'
 export RELAY_ENTRY_S2S_TOKEN='same-secret-as-vendor'
-app remote-token --resolver-url 'http://127.0.0.1:23188/api/relay/resolver'
+app remote-token --resolver-url 'http://127.0.0.1:23188/api/resolver'
 ```
 
 将输出写入 Entry 的 `DIRECTIVE_REMOTE_TOKEN`。不要把该值交给 API 用户或写入 Console 数据库。
@@ -42,11 +42,11 @@ app remote-token --resolver-url 'http://127.0.0.1:23188/api/relay/resolver'
 
 ## 配置
 
-- `DIRECTIVE_REMOTE_TOKEN`：上一步生成的固定内部 `dp.22.remote` Token。
+- `DIRECTIVE_REMOTE_TOKEN`：上一步生成的固定 Relay `dp.22.remote` Token。
 - `DIRECTIVE_PROXY_BASE_URL`：directive-proxy 的内部 HTTP 地址。
 - `PGHOST`、`PGPORT`、`PGUSER`、`PGDATABASE`、`PGPASSWORD`：Console PostgreSQL。
 
-Vendor 的 `/api/relay/resolver` 与公共 `/api/resolver` 共用 `server.http.listen`。默认同机部署可用
+Vendor 的公共凭据与 Relay S2S 模式共用 `/api/resolver` 和 `server.http.listen`。默认同机部署可用
 `http://127.0.0.1:23188` 省去本机 TLS；跨主机或经公网入口时改用可达的 HTTPS URL。无论传输方式如何，
 Vendor 都会验证 S2S Bearer 和 Credential UUID，Entry 不验证 `dpr_*`。
 
