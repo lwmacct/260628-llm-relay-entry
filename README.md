@@ -32,6 +32,7 @@ HTTP 调用实际由 directive-proxy 发起；Vendor 用 S2S Bearer 选择 Relay
 ```bash
 export DIRECTIVE_HMAC_SECRET='same-secret-as-directive-proxy'
 export RELAY_ENTRY_S2S_TOKEN='same-secret-as-vendor'
+# 使用 directive-proxy 镜像或二进制提供的命令
 app remote-token --resolver-url 'http://127.0.0.1:23188/api/resolver'
 ```
 
