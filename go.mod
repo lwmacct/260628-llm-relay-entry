@@ -9,7 +9,7 @@ require (
 	github.com/lwmacct/251219-go-pkg-logm v0.9.260413
 	github.com/lwmacct/260614-go-pkg-tlsreload v0.15.260716
 	github.com/lwmacct/260622-go-pkg-tddcheck v0.23.260814
-	github.com/urfave/cli/v3 v3.10.1
+	github.com/urfave/cli/v3 v3.11.0
 )
 
 require (
