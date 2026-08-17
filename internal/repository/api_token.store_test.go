@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 )
 
 func TestFetchAPITokenGrantUsesPlaintextControlPlaneContract(t *testing.T) {
-	token := fmt.Sprintf("llmr_test-token-%d", time.Now().UnixNano())
+	token := "sk-rdp-v1-" + strings.Repeat("A", 43)
 	sqlDB, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatal(err)

@@ -8,7 +8,7 @@ LLM Relay Entry 是公开 API 数据面。它只处理 `POST /v1/responses`，�
 ## 请求链
 
 ```text
-User llmr_ Token
+User sk-rdp-v1- Token (43-character alphanumeric suffix)
   -> Entry 查询 Console PostgreSQL
   -> Entry 注入固定 dp.22.remote Token、Credential UUID 和派生亲和键
   -> directive-proxy

@@ -21,6 +21,12 @@ const (
 	CodexHeaderInternalSessionID = "Session_id"
 )
 
+const (
+	apiKeyPrefix       = "sk-rdp-v1-" //nolint:gosec // This is a public API key format prefix, not a credential.
+	apiKeySuffixLength = 43
+	apiKeyAlphabet     = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+)
+
 type CodexEntryInput struct {
 	Authorization   string
 	SessionID       string
@@ -79,12 +85,19 @@ func utilBearerToken(value string) string {
 }
 
 func utilValidAPIToken(token string) bool {
-	encoded, found := strings.CutPrefix(token, "llmr_")
-	if !found {
+	if !strings.HasPrefix(token, apiKeyPrefix) {
 		return false
 	}
-	raw, err := base64.RawURLEncoding.DecodeString(encoded)
-	return err == nil && len(raw) == 32
+	suffix := token[len(apiKeyPrefix):]
+	if len(suffix) != apiKeySuffixLength {
+		return false
+	}
+	for i := range suffix {
+		if !strings.ContainsRune(apiKeyAlphabet, rune(suffix[i])) {
+			return false
+		}
+	}
+	return true
 }
 
 func utilAPIAffinityKey(secret string, apiKeyID int64, sessionID string) string {

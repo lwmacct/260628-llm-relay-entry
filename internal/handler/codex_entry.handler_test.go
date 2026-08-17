@@ -2,7 +2,6 @@ package handler
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -56,6 +55,8 @@ func TestCodexEntryRejectsInvalidOrUnavailableToken(t *testing.T) {
 	}{
 		//nolint:gosec // This malformed value is intentionally not a real token.
 		{name: "malformed", token: "not-a-relay-token"},
+		{name: "legacy-prefix", token: "llmr_" + strings.Repeat("A", 43)},
+		{name: "invalid-character", token: "sk-rdp-v1-" + strings.Repeat("A", 42) + "-"},
 		{name: "unavailable", token: testAPIToken(), lookup: repository.ErrAPITokenNotFound},
 	}
 	for _, test := range tests {
@@ -100,7 +101,7 @@ func TestCodexEntryReturnsServiceUnavailableForDatabaseFailure(t *testing.T) {
 }
 
 func testAPIToken() string {
-	return "llmr_" + base64.RawURLEncoding.EncodeToString([]byte(strings.Repeat("\xff", 32)))
+	return "sk-rdp-v1-" + strings.Repeat("A", 43)
 }
 
 type stubGrantResolver struct {
