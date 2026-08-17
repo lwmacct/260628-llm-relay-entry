@@ -30,11 +30,11 @@ type headerMutation struct {
 	Values []string `json:"values"`
 }
 
-func Generate(directiveSecret, resolverURL, resolverToken string) (string, error) {
-	directiveSecret = strings.TrimSpace(directiveSecret)
+func Generate(hmacSecret, resolverURL, resolverToken string) (string, error) {
+	hmacSecret = strings.TrimSpace(hmacSecret)
 	resolverToken = strings.TrimSpace(resolverToken)
-	if directiveSecret == "" || resolverToken == "" {
-		return "", errors.New("directive and resolver secrets are required")
+	if hmacSecret == "" || resolverToken == "" {
+		return "", errors.New("HMAC secret and resolver token are required")
 	}
 	resolverURL = strings.TrimSpace(resolverURL)
 	parsed, err := url.Parse(resolverURL)
@@ -49,7 +49,7 @@ func Generate(directiveSecret, resolverURL, resolverToken string) (string, error
 		return "", err
 	}
 	payload := base64.RawURLEncoding.EncodeToString(raw)
-	mac := hmac.New(sha256.New, []byte(directiveSecret))
+	mac := hmac.New(sha256.New, []byte(hmacSecret))
 	_, _ = mac.Write([]byte(payload))
 	return strings.Join([]string{
 		"dp", "22", "remote",

@@ -20,12 +20,12 @@ var Command = &cli.Command{
 }
 
 func action(_ context.Context, command *cli.Command) error {
-	directiveSecret := strings.TrimSpace(os.Getenv("DIRECTIVE_TOKEN_SECRET"))
+	hmacSecret := strings.TrimSpace(os.Getenv("DIRECTIVE_HMAC_SECRET"))
 	resolverToken := strings.TrimSpace(os.Getenv("RELAY_ENTRY_S2S_TOKEN"))
-	if directiveSecret == "" || resolverToken == "" {
-		return errors.New("DIRECTIVE_TOKEN_SECRET and RELAY_ENTRY_S2S_TOKEN are required")
+	if hmacSecret == "" || resolverToken == "" {
+		return errors.New("DIRECTIVE_HMAC_SECRET and RELAY_ENTRY_S2S_TOKEN are required")
 	}
-	token, err := Generate(directiveSecret, command.String("resolver-url"), resolverToken)
+	token, err := Generate(hmacSecret, command.String("resolver-url"), resolverToken)
 	if err != nil {
 		return err
 	}

@@ -30,7 +30,7 @@ Entry 不验证 `dpr_*`，Vendor resolver 的 Relay 模式也不要求它。
 HTTP 调用实际由 directive-proxy 发起；Vendor 用 S2S Bearer 选择 Relay 认证模式。使用下列命令生成：
 
 ```bash
-export DIRECTIVE_TOKEN_SECRET='same-secret-as-directive-proxy'
+export DIRECTIVE_HMAC_SECRET='same-secret-as-directive-proxy'
 export RELAY_ENTRY_S2S_TOKEN='same-secret-as-vendor'
 app remote-token --resolver-url 'http://127.0.0.1:23188/api/resolver'
 ```

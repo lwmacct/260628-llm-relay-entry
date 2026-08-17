@@ -10,7 +10,7 @@ import (
 )
 
 func TestGenerateBuildsRelayHTTPRemoteToken(t *testing.T) {
-	token, err := Generate("directive-secret", "https://vendor.example/api/resolver", "entry-s2s-token")
+	token, err := Generate("hmac-secret", "https://vendor.example/api/resolver", "entry-s2s-token")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +29,7 @@ func TestGenerateBuildsRelayHTTPRemoteToken(t *testing.T) {
 	if spec.HTTP == nil || spec.HTTP.URL != "https://vendor.example/api/resolver" || spec.HTTP.Headers.Mutations[0].Values[0] != "Bearer entry-s2s-token" {
 		t.Fatalf("unexpected remote spec: %#v", spec)
 	}
-	mac := hmac.New(sha256.New, []byte("directive-secret"))
+	mac := hmac.New(sha256.New, []byte("hmac-secret"))
 	_, _ = mac.Write([]byte(parts[3]))
 	if !hmac.Equal(mac.Sum(nil), mustDecode(t, parts[4])) {
 		t.Fatal("invalid token signature")

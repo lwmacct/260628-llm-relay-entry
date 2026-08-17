@@ -12,5 +12,8 @@ var files = cfgm.ConfigFiles[Config]{
 	RuntimeFile: "config/config.yaml",
 }
 
-func TestWriteConfigExample(t *testing.T)     { files.WriteExample(t) }
-func TestRuntimeConfigKeysValid(t *testing.T) { files.ValidateRuntimeConfig(t) }
+func TestWriteConfigExample(t *testing.T) { files.WriteExample(t) }
+func TestRuntimeConfigKeysValid(t *testing.T) {
+	t.Setenv("DIRECTIVE_REMOTE_TOKEN", "dp.22.remote.payload.signature")
+	files.ValidateRuntimeConfig(t)
+}
