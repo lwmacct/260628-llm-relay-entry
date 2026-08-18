@@ -8,10 +8,9 @@ import (
 var ErrAPITokenNotFound = errors.New("api token not found")
 
 type APITokenGrant struct {
-	APIKeyID      string
-	UserID        string
-	BindingID     string
-	VendorRouteID string
+	APIKeyID       string
+	UserID         string
+	RelayTargetRef string
 }
 
 type APITokenLookup struct {

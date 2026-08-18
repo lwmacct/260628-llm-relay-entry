@@ -16,10 +16,9 @@ import (
 func TestCodexEntryAuthorizesAndForwardsResponses(t *testing.T) {
 	token := testAPIToken()
 	grants := &stubGrantResolver{grant: repository.APITokenGrant{ //nolint:gosec // Resource IDs, not credentials.
-		APIKeyID:      "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
-		UserID:        "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b3",
-		BindingID:     "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
-		VendorRouteID: "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b3",
+		APIKeyID:       "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
+		UserID:         "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b3",
+		RelayTargetRef: "target-main",
 	}}
 	//nolint:gosec // The values are deliberately invalid test-only credentials.
 	entries, err := service.NewCodexEntryService(grants, service.APIEntrySettings{
@@ -43,7 +42,7 @@ func TestCodexEntryAuthorizesAndForwardsResponses(t *testing.T) {
 	if grants.received.Token != token {
 		t.Fatalf("unexpected token lookup: %#v", grants.received)
 	}
-	if forwarder.forward.DirectiveToken != "dp.22.remote.payload.signature" || forwarder.forward.VendorRouteID != grants.grant.VendorRouteID || !strings.HasPrefix(forwarder.forward.AffinityKey, "a1_") {
+	if forwarder.forward.DirectiveToken != "dp.22.remote.payload.signature" || forwarder.forward.RelayTargetRef != grants.grant.RelayTargetRef || !strings.HasPrefix(forwarder.forward.AffinityKey, "a1_") {
 		t.Fatalf("unexpected forward: %#v", forwarder.forward)
 	}
 }

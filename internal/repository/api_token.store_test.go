@@ -21,16 +21,16 @@ func TestFetchAPITokenGrantUsesPlaintextControlPlaneContract(t *testing.T) {
 	}
 	db := bun.NewDB(sqlDB, pgdialect.New())
 	t.Cleanup(func() { _ = db.Close() })
-	mock.ExpectQuery(regexp.QuoteMeta("SELECT ak.id AS api_key_id, ak.user_id AS user_id, ak.binding_id AS binding_id, rb.vendor_route_id AS vendor_route_id FROM api_keys AS ak") + ".*" + regexp.QuoteMeta(fmt.Sprintf("WHERE (ak.token = '%s')", token))).
-		WillReturnRows(sqlmock.NewRows([]string{"api_key_id", "user_id", "binding_id", "vendor_route_id"}).
-			AddRow("api-key-id", "user-id", "binding-id", "route-id"))
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT ak.id AS api_key_id, ak.user_id AS user_id, akg.relay_target_ref AS relay_target_ref FROM api_keys AS ak") + ".*" + regexp.QuoteMeta(fmt.Sprintf("WHERE (ak.token = '%s')", token))).
+		WillReturnRows(sqlmock.NewRows([]string{"api_key_id", "user_id", "relay_target_ref"}).
+			AddRow("api-key-id", "user-id", "target-main"))
 	grant, err := NewStore(db).FetchAPITokenGrant(context.Background(), APITokenLookup{
 		Token: token, At: time.Now().UTC(),
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if grant.APIKeyID != "api-key-id" || grant.UserID != "user-id" || grant.BindingID != "binding-id" || grant.VendorRouteID != "route-id" {
+	if grant.APIKeyID != "api-key-id" || grant.UserID != "user-id" || grant.RelayTargetRef != "target-main" {
 		t.Fatalf("unexpected grant: %#v", grant)
 	}
 	if err = mock.ExpectationsWereMet(); err != nil {

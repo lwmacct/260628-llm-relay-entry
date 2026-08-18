@@ -17,7 +17,7 @@ import (
 
 const (
 	HeaderClientRequestID  = "X-Client-Request-Id"
-	HeaderRouteID          = "X-Relay-Route-Id"
+	HeaderTargetRef        = "X-Relay-Target-Ref"
 	HeaderResolverAffinity = "X-Resolver-Affinity-Key"
 	maxErrorBodyBytes      = 256 * 1024
 )
@@ -29,7 +29,7 @@ type errorResponse struct {
 
 type ForwardRequest struct {
 	DirectiveToken  string
-	VendorRouteID   string
+	RelayTargetRef  string
 	AffinityKey     string
 	RequestID       string
 	ClientRequestID string
@@ -106,7 +106,7 @@ func NewProxy(baseURL string, options ...Option) (*Proxy, error) {
 			forward, _ := forwardRequestFromContext(request.In.Context())
 			rewriteOutboundRequest(request, targetURL)
 			request.Out.Header.Set("Authorization", "Bearer "+forward.DirectiveToken)
-			request.Out.Header.Set(HeaderRouteID, forward.VendorRouteID)
+			request.Out.Header.Set(HeaderTargetRef, forward.RelayTargetRef)
 			request.Out.Header.Set(HeaderResolverAffinity, forward.AffinityKey)
 			if forward.ClientRequestID != "" {
 				request.Out.Header.Set(HeaderClientRequestID, forward.ClientRequestID)
