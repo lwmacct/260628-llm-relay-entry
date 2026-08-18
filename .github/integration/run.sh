@@ -98,6 +98,18 @@ __wait_http() {
   __fail "$_name did not become ready: $_url"
 }
 
+__wait_postgres() {
+  local _attempt
+  for _attempt in $(seq 1 "$_wait_attempts"); do
+    if __compose exec -T postgres pg_isready -U ci -d postgres >/dev/null 2>&1; then
+      echo "ok: postgres"
+      return 0
+    fi
+    sleep 1
+  done
+  __fail "postgres did not become ready"
+}
+
 __assert_status() {
   local _name="$1"
   local _expected="$2"
@@ -182,7 +194,7 @@ __main() {
     --format '{{index .RepoDigests 0}}'
 
   __compose up -d postgres
-  __compose exec -T postgres pg_isready -U ci -d postgres >/dev/null
+  __wait_postgres
 
   _vendor_seed_file="$_tmp_dir/vendor-seed.json"
   echo "seeding Vendor database"
