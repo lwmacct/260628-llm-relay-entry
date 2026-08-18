@@ -6,8 +6,6 @@ on:
   repository_dispatch:
     types:
       - relay-latest-published
-  schedule:
-    - cron: "17 2 * * *"
 
 concurrency:
   group: integration-latest
