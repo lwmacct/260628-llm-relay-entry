@@ -199,7 +199,7 @@ __main() {
   _vendor_seed_file="$_tmp_dir/vendor-seed.json"
   echo "seeding Vendor database"
   __compose run --rm -T --no-deps vendor-cli \
-    server --config=/app/data/config/ci.yaml database reset --confirm --output json --show-secrets \
+    server --config=/app/data/config/ci.yaml database --confirm --output json --show-secrets reset \
     >"$_vendor_seed_file"
   _remote_spec="$(jq -cer '.remoteSpec' "$_vendor_seed_file")"
   _resolver_token="$(jq -er '.. | strings | select(test("^Bearer dpr_"))' "$_vendor_seed_file" | sed -E 's/^Bearer //')"
@@ -208,8 +208,8 @@ __main() {
   _console_seed_file="$_tmp_dir/console-seed.json"
   echo "seeding Console database"
   __compose run --rm -T --no-deps console-cli \
-    server --config=/app/data/config/ci.yaml database reset --confirm \
-    --remote-spec "$_remote_spec" --output json --show-secrets \
+    server --config=/app/data/config/ci.yaml database --confirm \
+    --remote-spec "$_remote_spec" --output json --show-secrets reset \
     >"$_console_seed_file"
   _api_token="$(jq -er '.apiToken' "$_console_seed_file")"
   __mask "$_api_token"
