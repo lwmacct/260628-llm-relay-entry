@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ci
+      POSTGRES_PASSWORD: ci
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/001-relay.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ci -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  vendor-cli:
+    image: ${RELAY_IMAGE_PREFIX:-ghcr.io/lwmacct}/260628-llm-relay-vendor:latest
+    entrypoint: ["app"]
+    volumes:
+      - ${INTEGRATION_CONFIG_DIR:?INTEGRATION_CONFIG_DIR is required}/vendor.yaml:/app/data/config/ci.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  console-cli:
+    image: ${RELAY_IMAGE_PREFIX:-ghcr.io/lwmacct}/260628-llm-relay-console:latest
+    entrypoint: ["app"]
+    volumes:
+      - ${INTEGRATION_CONFIG_DIR:?INTEGRATION_CONFIG_DIR is required}/console.yaml:/app/data/config/ci.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  vendor:
+    image: ${RELAY_IMAGE_PREFIX:-ghcr.io/lwmacct}/260628-llm-relay-vendor:latest
+    volumes:
+      - ${INTEGRATION_CONFIG_DIR:?INTEGRATION_CONFIG_DIR is required}/vendor.yaml:/app/data/config/ci.yaml:ro
+    command: ["app", "server", "--config=/app/data/config/ci.yaml"]
+    ports:
+      - "${VENDOR_PORT:-23188}:23188"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  directive-proxy:
+    image: ${RELAY_IMAGE_PREFIX:-ghcr.io/lwmacct}/260628-directive-proxy:latest
+    volumes:
+      - ${INTEGRATION_CONFIG_DIR:?INTEGRATION_CONFIG_DIR is required}/directive-proxy.yaml:/app/data/config/ci.yaml:ro
+    command: ["app", "server", "--config=/app/data/config/ci.yaml"]
+    ports:
+      - "${DIRECTIVE_PROXY_PORT:-23198}:23198"
+    depends_on:
+      vendor:
+        condition: service_started
+
+  entry:
+    image: ${RELAY_IMAGE_PREFIX:-ghcr.io/lwmacct}/260628-llm-relay-entry:latest
+    volumes:
+      - ${INTEGRATION_CONFIG_DIR:?INTEGRATION_CONFIG_DIR is required}/entry.yaml:/app/data/config/ci.yaml:ro
+    command: ["app", "server", "--config=/app/data/config/ci.yaml"]
+    ports:
+      - "${ENTRY_PORT:-23168}:23168"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      directive-proxy:
+        condition: service_started
+
+volumes:
+  postgres-data:

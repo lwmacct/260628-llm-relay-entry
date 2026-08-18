@@ -1,0 +1,46 @@
+name: integration-latest
+run-name: "relay latest integration ${{ github.event_name }} #${{ github.run_number }}"
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types:
+      - relay-latest-published
+  schedule:
+    - cron: "17 2 * * *"
+
+concurrency:
+  group: integration-latest
+  cancel-in-progress: true
+
+jobs:
+  relay-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout integration driver
+        uses: actions/checkout@v7.0.0
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run latest-image relay smoke
+        env:
+          RELAY_INTEGRATION_ARTIFACT_DIR: ${{ runner.temp }}/relay-integration
+        run: bash .github/integration/run.sh
+
+      - name: Upload integration logs
+        if: failure()
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: relay-latest-integration-logs
+          path: ${{ runner.temp }}/relay-integration
+          if-no-files-found: warn
+          retention-days: 7

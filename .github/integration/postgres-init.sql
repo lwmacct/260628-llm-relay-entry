@@ -1,0 +1,2 @@
+CREATE DATABASE console;
+CREATE DATABASE vendor;
