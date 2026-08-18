@@ -8,8 +8,8 @@ import (
 var ErrAPITokenNotFound = errors.New("api token not found")
 
 type APITokenGrant struct {
-	APIKeyID      int64
-	UserID        int64
+	APIKeyID      string
+	UserID        string
 	BindingID     string
 	VendorRouteID string
 }

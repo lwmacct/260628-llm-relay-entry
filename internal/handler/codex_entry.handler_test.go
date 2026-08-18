@@ -15,8 +15,10 @@ import (
 
 func TestCodexEntryAuthorizesAndForwardsResponses(t *testing.T) {
 	token := testAPIToken()
-	grants := &stubGrantResolver{grant: repository.APITokenGrant{
-		APIKeyID: 42, UserID: 7, BindingID: "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
+	grants := &stubGrantResolver{grant: repository.APITokenGrant{ //nolint:gosec // Resource IDs, not credentials.
+		APIKeyID:      "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
+		UserID:        "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b3",
+		BindingID:     "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
 		VendorRouteID: "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b3",
 	}}
 	//nolint:gosec // The values are deliberately invalid test-only credentials.

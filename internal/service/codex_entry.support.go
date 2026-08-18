@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
-	"strconv"
 	"strings"
 	"time"
 
@@ -40,8 +39,8 @@ type CodexPreparedForward struct {
 }
 
 type CodexResolvedCredential struct {
-	APIKeyID      int64
-	UserID        int64
+	APIKeyID      string
+	UserID        string
 	BindingID     string
 	VendorRouteID string
 }
@@ -100,8 +99,8 @@ func utilValidAPIToken(token string) bool {
 	return true
 }
 
-func utilAPIAffinityKey(secret string, apiKeyID int64, sessionID string) string {
+func utilAPIAffinityKey(secret, apiKeyID, sessionID string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
-	_, _ = mac.Write([]byte("affinity\x00" + strconv.FormatInt(apiKeyID, 10) + "\x00" + strings.TrimSpace(sessionID)))
+	_, _ = mac.Write([]byte("affinity\x00" + strings.TrimSpace(apiKeyID) + "\x00" + strings.TrimSpace(sessionID)))
 	return "a1_" + base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
 }
