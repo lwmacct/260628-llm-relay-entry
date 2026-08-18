@@ -52,7 +52,7 @@ type ServerRelay struct {
 func DefaultConfig() Config {
 	return Config{Server: Server{
 		HTTP: ServerHTTP{
-			Listen: ":23108",
+			Listen: ":23168",
 			TLS: func() tlsreload.Config {
 				cfg := tlsreload.DefaultConfig()
 				cfg.Enabled = false

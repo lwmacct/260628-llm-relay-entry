@@ -7,7 +7,7 @@ server:
 
   # HTTP 服务配置
   http:
-    listen: ":23108" # HTTP 服务监听地址
+    listen: ":23168" # HTTP 服务监听地址
 
     # HTTPS TLS 配置
     tls:
