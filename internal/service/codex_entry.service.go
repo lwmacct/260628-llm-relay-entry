@@ -40,11 +40,11 @@ func (s *CodexEntryService) PrepareForward(ctx context.Context, input CodexEntry
 		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusServiceUnavailable, Message: "API entry is temporarily unavailable", Err: err}
 	}
 	resolved := CodexResolvedCredential{
-		APIKeyID: grant.APIKeyID, UserID: grant.UserID, RelayTargetRef: grant.RelayTargetRef,
+		APIKeyID: grant.APIKeyID, UserID: grant.UserID, RelayTargetID: grant.RelayTargetID,
 	}
 	return CodexPreparedForward{
 		Forward: relay.ForwardRequest{
-			DirectiveToken: s.directiveToken, RelayTargetRef: grant.RelayTargetRef,
+			DirectiveToken: s.directiveToken, RelayTargetID: grant.RelayTargetID,
 			AffinityKey: utilAPIAffinityKey(token, grant.APIKeyID, input.SessionID),
 			RequestID:   input.RequestID, ClientRequestID: input.ClientRequestID,
 		},

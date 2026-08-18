@@ -57,14 +57,14 @@ func TestProxyRebuildsTrustedDirectiveHeaders(t *testing.T) {
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "https://entry.example/v1/responses?stream=true", strings.NewReader("request"))
 	request.Header.Set("Authorization", "Bearer user-token")
 	request.Header.Set("Cookie", "session=secret")
-	request.Header.Set(HeaderTargetRef, "spoofed")
+	request.Header.Set(HeaderTargetID, "spoofed")
 	request.Header.Set(HeaderResolverAffinity, "spoofed")
 	request.Header.Set("X-Dp-Internal", "spoofed")
 	request.Header.Set("X-Forwarded-For", "198.51.100.10")
 	response := httptest.NewRecorder()
 	//nolint:gosec // These are deliberately invalid test-only credential values.
 	proxy.ServeHTTP(response, request, ForwardRequest{
-		DirectiveToken: "dp.22.remote.payload.signature", RelayTargetRef: "target-main",
+		DirectiveToken: "dp.22.remote.payload.signature", RelayTargetID: "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
 		AffinityKey: "affinity-key", ClientRequestID: "request-id",
 	})
 	if response.Code != http.StatusOK {
@@ -74,7 +74,7 @@ func TestProxyRebuildsTrustedDirectiveHeaders(t *testing.T) {
 	if got == nil || got.URL.String() != "https://directive.internal/base/v1/responses?stream=true" {
 		t.Fatalf("unexpected target request: %#v", got)
 	}
-	if got.Header.Get("Authorization") != "Bearer dp.22.remote.payload.signature" || got.Header.Get(HeaderTargetRef) != "target-main" || got.Header.Get(HeaderResolverAffinity) != "affinity-key" {
+	if got.Header.Get("Authorization") != "Bearer dp.22.remote.payload.signature" || got.Header.Get(HeaderTargetID) != "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2" || got.Header.Get(HeaderResolverAffinity) != "affinity-key" {
 		t.Fatalf("trusted headers were not rebuilt: %v", got.Header)
 	}
 	for _, name := range []string{"Cookie", "X-Dp-Internal", "X-Forwarded-For"} {

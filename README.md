@@ -10,17 +10,17 @@ LLM Relay Entry 是公开 API 数据面。它只处理 `POST /v1/responses`，�
 ```text
 User sk-rdp-v1- Token (43-character alphanumeric suffix)
   -> Entry 查询 Console PostgreSQL
-  -> Entry 注入固定 dp.22.remote Token、Key Group 的 relayTargetRef 和派生亲和键
+  -> Entry 注入固定 dp.22.remote Token、Key Group 的 relayTargetId 和派生亲和键
   -> directive-proxy
   -> Vendor 统一 resolver /api/resolver（Relay 认证模式）
   -> Vendor API
 ```
 
-Entry 对每个请求执行一次按完整 Token 索引的数据库查询，并同时校验 API Key、用户、Key 分组、过期时间和 Key 限额。数据库只返回 Vendor-owned relayTargetRef，不返回 Vendor Route UUID、URL、连接池或上游密钥。
+Entry 对每个请求执行一次按完整 Token 索引的数据库查询，并同时校验 API Key、用户、Key 分组、过期时间和 Key 限额。数据库只返回 Vendor-owned `RelayTarget.id`，不返回 Vendor Route UUID、URL、连接池或上游密钥。
 
-用户提供的 `Authorization`、Cookie、代理披露头、`X-Dp-*`、`X-Relay-Target-Ref` 和 `X-Resolver-Affinity-Key` 会在出站前删除。Entry 随后写入服务端固定 Remote Token、数据库解析出的 relayTargetRef，以及由 Key ID 和可选 `Session-Id` 派生的亲和键。
+用户提供的 `Authorization`、Cookie、代理披露头、`X-Dp-*`、`X-Relay-Target-ID` 和 `X-Resolver-Affinity-Key` 会在出站前删除。Entry 随后写入服务端固定 Remote Token、数据库解析出的 Relay Target UUID，以及由 Key ID 和可选 `Session-Id` 派生的亲和键。
 
-Vendor 的 `relayTargetRef` 是稳定别名；Vendor 可在内部切换或删除当前 Directive Route，而不要求 Entry 或 Key Group 保存 Route UUID。
+Vendor 的 `RelayTarget.id` 是稳定 UUID；Vendor 可在内部切换或删除当前 Directive Route，而不要求 Entry 或 Key Group 保存 Route UUID。
 Entry 不验证 `dpr_*`，Vendor resolver 的 Relay 模式也不要求它。
 
 ## 固定 Remote Token
@@ -32,7 +32,9 @@ HTTP 调用实际由 directive-proxy 发起；Vendor 用 S2S Bearer 选择 Relay
 export DIRECTIVE_HMAC_SECRET='same-secret-as-directive-proxy'
 export RELAY_ENTRY_S2S_TOKEN='same-secret-as-vendor'
 # 使用 directive-proxy 镜像或二进制提供的命令
-app remote-token --resolver-url 'http://127.0.0.1:23188/api/resolver'
+app remote-token \
+  --resolver-url 'http://127.0.0.1:23188/api/resolver' \
+  --resolver-token "$RELAY_ENTRY_S2S_TOKEN"
 ```
 
 将输出写入 Entry 的 `DIRECTIVE_REMOTE_TOKEN`。不要把该值交给 API 用户或写入 Console 数据库。
@@ -46,9 +48,9 @@ app remote-token --resolver-url 'http://127.0.0.1:23188/api/resolver'
 - `DIRECTIVE_PROXY_BASE_URL`：directive-proxy 的内部 HTTP 地址。
 - `PGHOST`、`PGPORT`、`PGUSER`、`PGDATABASE`、`PGPASSWORD`：Console PostgreSQL。
 
-Vendor 的公共 Directive Route Token 与 Relay S2S 模式共用 `/api/resolver` 和 `server.http.listen`。默认同机部署可用
+Vendor 的公共 Relay Target Token 与 Relay S2S 模式共用 `/api/resolver` 和 `server.http.listen`。默认同机部署可用
 `http://127.0.0.1:23188` 省去本机 TLS；跨主机或经公网入口时改用可达的 HTTPS URL。无论传输方式如何，
-Vendor 都会验证 S2S Bearer 和 relayTargetRef，Entry 不验证 `dpr_*`。
+Vendor 都会验证 S2S Bearer 和 Relay Target UUID，Entry 不验证 `dpr_*`。
 
 Entry 直接以用户提交的完整 Token 查询 `api_keys.token`。PostgreSQL 账号应只拥有 `api_keys`、`users`、`api_key_groups` 的 `SELECT` 权限；数据库备份和查询日志必须按敏感凭据保护。Entry 不执行建表或迁移。
 
