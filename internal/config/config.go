@@ -41,7 +41,7 @@ type ServerDatabase struct {
 
 type ServerRelay struct {
 	BaseURL             string        `json:"base-url"                desc:"Directive Proxy HTTP 基址"`
-	DirectiveToken      string        `json:"directive-token"         desc:"固定 dp.22.remote Token，仅在 Entry 到 Directive Proxy 之间使用"`
+	HMACSecret          string        `json:"hmac-secret"             desc:"运行时签发 dp.22.remote 的 HMAC 密钥"`
 	MaxIdleConns        int           `json:"max-idle-conns"          desc:"下游全局空闲连接池容量"`
 	MaxIdleConnsPerHost int           `json:"max-idle-conns-per-host" desc:"下游单主机空闲连接池容量"`
 	MaxConnsPerHost     int           `json:"max-conns-per-host"      desc:"下游单主机活跃连接上限；0 表示不限制"`
@@ -77,9 +77,10 @@ func DefaultConfig() Config {
 			Host: "${PGHOST}", Port: "${PGPORT}", User: "${PGUSER}", Database: "${PGDATABASE}", Password: "${PGPASSWORD}",
 			MaxOpenConns: 32, MaxIdleConns: 16,
 		},
+		//nolint:gosec // HMACSecret is an environment expression, not a hardcoded credential.
 		Relay: ServerRelay{
 			BaseURL:             "${DIRECTIVE_PROXY_BASE_URL:-http://localhost:23198}",
-			DirectiveToken:      "${DIRECTIVE_REMOTE_TOKEN:?fixed dp.22.remote token is required}",
+			HMACSecret:          "${DIRECTIVE_HMAC_SECRET:?directive HMAC secret is required}",
 			MaxIdleConns:        4096,
 			MaxIdleConnsPerHost: 2048,
 			IdleConnTimeout:     time.Minute,

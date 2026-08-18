@@ -9,17 +9,32 @@ require (
 	github.com/lwmacct/251219-go-pkg-logm v0.9.260413
 	github.com/lwmacct/260614-go-pkg-tlsreload v0.15.260716
 	github.com/lwmacct/260622-go-pkg-tddcheck v0.23.260814
+	github.com/lwmacct/260628-directive-proxy v0.81.260818
 	github.com/urfave/cli/v3 v3.11.0
 )
 
 require (
+	github.com/VictoriaMetrics/metrics v1.44.0 // indirect
+	github.com/coder/websocket v1.8.15 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/lwmacct/260714-go-pkg-fluent v0.6.260716 // indirect
+	github.com/lwmacct/260714-go-pkg-llmperf v0.2.260715 // indirect
+	github.com/lwmacct/260714-go-pkg-llmusage v0.2.260714 // indirect
+	github.com/lwmacct/260718-go-pkg-clientip v0.2.260718 // indirect
+	github.com/lwmacct/260718-go-pkg-ipallow v0.3.260718 // indirect
+	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
+	github.com/redis/go-redis/v9 v9.22.0 // indirect
+	github.com/tinylib/msgp v1.6.4 // indirect
 	github.com/tmthrgd/go-hex v0.0.0-20190904060850-447a3041c3bc // indirect
+	github.com/valyala/fastrand v1.1.0 // indirect
+	github.com/valyala/histogram v1.2.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	go.opentelemetry.io/otel v1.45.0 // indirect
 	go.opentelemetry.io/otel/trace v1.45.0 // indirect
+	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	mellium.im/sasl v0.3.2 // indirect
 )

@@ -65,7 +65,6 @@ func utilLogResolvedCredential(r *http.Request, requestID string, resolved servi
 		"method", utilSanitizeLogValue(utilRequestMethod(r)),
 		"path", utilSanitizeLogValue(utilRequestPath(r)),
 		"api_key_id", resolved.APIKeyID,
-		"relay_target_id", utilSanitizeLogValue(resolved.RelayTargetID),
 	)
 }
 

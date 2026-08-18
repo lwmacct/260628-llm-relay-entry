@@ -28,7 +28,7 @@ func newRuntime(ctx context.Context, cfg *config.Config) (*runtimeState, error) 
 		return nil, fmt.Errorf("open token database: %w", err)
 	}
 	entries, err := service.NewCodexEntryService(repository.NewStore(db), service.APIEntrySettings{
-		DirectiveToken: cfg.Server.Relay.DirectiveToken,
+		HMACSecret: cfg.Server.Relay.HMACSecret,
 	})
 	if err != nil {
 		_ = db.Close()

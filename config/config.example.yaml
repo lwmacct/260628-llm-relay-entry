@@ -43,7 +43,7 @@ server:
   # Directive Proxy 数据面配置
   relay:
     base-url: "${DIRECTIVE_PROXY_BASE_URL:-http://localhost:23198}" # Directive Proxy HTTP 基址
-    directive-token: "${DIRECTIVE_REMOTE_TOKEN:?fixed dp.22.remote token is required}" # 固定 dp.22.remote Token，仅在 Entry 到 Directive Proxy 之间使用
+    hmac-secret: "${DIRECTIVE_HMAC_SECRET:?directive HMAC secret is required}" # 运行时签发 dp.22.remote 的 HMAC 密钥
     max-idle-conns: 4096 # 下游全局空闲连接池容量
     max-idle-conns-per-host: 2048 # 下游单主机空闲连接池容量
     max-conns-per-host: 0 # 下游单主机活跃连接上限；0 表示不限制

@@ -7,23 +7,25 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lwmacct/260628-directive-proxy/pkg/directive"
+
 	"github.com/lwmacct/260628-llm-relay-entry/internal/infra/relay"
 	"github.com/lwmacct/260628-llm-relay-entry/internal/repository"
 )
 
 type CodexEntryService struct {
-	grants         APITokenGrantResolver
-	directiveToken string
-	now            apiEntryClock
+	grants     APITokenGrantResolver
+	hmacSecret string
+	now        apiEntryClock
 }
 
 func NewCodexEntryService(grants APITokenGrantResolver, settings APIEntrySettings) (*CodexEntryService, error) {
-	settings.DirectiveToken = strings.TrimSpace(settings.DirectiveToken)
-	if grants == nil || !strings.HasPrefix(settings.DirectiveToken, "dp.22.remote.") {
+	settings.HMACSecret = strings.TrimSpace(settings.HMACSecret)
+	if grants == nil || settings.HMACSecret == "" {
 		return nil, ErrAPIEntryInvalidSettings
 	}
 	return &CodexEntryService{
-		grants: grants, directiveToken: settings.DirectiveToken, now: func() time.Time { return time.Now().UTC() },
+		grants: grants, hmacSecret: settings.HMACSecret, now: func() time.Time { return time.Now().UTC() },
 	}, nil
 }
 
@@ -39,14 +41,20 @@ func (s *CodexEntryService) PrepareForward(ctx context.Context, input CodexEntry
 	if err != nil {
 		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusServiceUnavailable, Message: "API entry is temporarily unavailable", Err: err}
 	}
-	resolved := CodexResolvedCredential{
-		APIKeyID: grant.APIKeyID, UserID: grant.UserID, RelayTargetID: grant.RelayTargetID,
+	remoteSpec, err := directive.DecodeRemoteSpec([]byte(grant.RemoteSpecJSON))
+	if err != nil {
+		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusServiceUnavailable, Message: "API entry remote directive is unavailable", Err: err}
 	}
+	directiveToken, err := directive.EncodeRemote(s.hmacSecret, remoteSpec)
+	if err != nil {
+		return CodexPreparedForward{}, &CodexEntryError{StatusCode: http.StatusServiceUnavailable, Message: "API entry remote directive is unavailable", Err: err}
+	}
+	resolved := CodexResolvedCredential{APIKeyID: grant.APIKeyID, UserID: grant.UserID}
 	return CodexPreparedForward{
 		Forward: relay.ForwardRequest{
-			DirectiveToken: s.directiveToken, RelayTargetID: grant.RelayTargetID,
-			AffinityKey: utilAPIAffinityKey(token, grant.APIKeyID, input.SessionID),
-			RequestID:   input.RequestID, ClientRequestID: input.ClientRequestID,
+			DirectiveToken: directiveToken,
+			AffinityKey:    utilAPIAffinityKey(token, grant.APIKeyID, input.SessionID),
+			RequestID:      input.RequestID, ClientRequestID: input.ClientRequestID,
 		},
 		Resolved: resolved,
 	}, nil

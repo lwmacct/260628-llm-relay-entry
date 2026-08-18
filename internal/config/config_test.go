@@ -14,6 +14,6 @@ var files = cfgm.ConfigFiles[Config]{
 
 func TestWriteConfigExample(t *testing.T) { files.WriteExample(t) }
 func TestRuntimeConfigKeysValid(t *testing.T) {
-	t.Setenv("DIRECTIVE_REMOTE_TOKEN", "dp.22.remote.payload.signature")
+	t.Setenv("DIRECTIVE_HMAC_SECRET", "test-hmac-secret")
 	files.ValidateRuntimeConfig(t)
 }

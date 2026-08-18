@@ -2,12 +2,14 @@ package handler
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/lwmacct/260628-directive-proxy/pkg/directive"
 	"github.com/lwmacct/260628-llm-relay-entry/internal/infra/relay"
 	"github.com/lwmacct/260628-llm-relay-entry/internal/repository"
 	"github.com/lwmacct/260628-llm-relay-entry/internal/service"
@@ -16,13 +18,12 @@ import (
 func TestCodexEntryAuthorizesAndForwardsResponses(t *testing.T) {
 	token := testAPIToken()
 	grants := &stubGrantResolver{grant: repository.APITokenGrant{ //nolint:gosec // Resource IDs, not credentials.
-		APIKeyID:      "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
-		UserID:        "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b3",
-		RelayTargetID: "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
+		APIKeyID:       "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
+		UserID:         "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b3",
+		RemoteSpecJSON: `{"uuid":"01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2","http":{"url":"https://resolver.example/resolver"}}`,
 	}}
-	//nolint:gosec // The values are deliberately invalid test-only credentials.
 	entries, err := service.NewCodexEntryService(grants, service.APIEntrySettings{
-		DirectiveToken: "dp.22.remote.payload.signature",
+		HMACSecret: "test-hmac-secret",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +43,10 @@ func TestCodexEntryAuthorizesAndForwardsResponses(t *testing.T) {
 	if grants.received.Token != token {
 		t.Fatalf("unexpected token lookup: %#v", grants.received)
 	}
-	if forwarder.forward.DirectiveToken != "dp.22.remote.payload.signature" || forwarder.forward.RelayTargetID != grants.grant.RelayTargetID || !strings.HasPrefix(forwarder.forward.AffinityKey, "a1_") {
+	parts := strings.Split(forwarder.forward.DirectiveToken, ".")
+	raw, decodeErr := base64.RawURLEncoding.DecodeString(parts[3])
+	decoded, specErr := directive.DecodeRemoteSpec(raw)
+	if decodeErr != nil || specErr != nil || decoded.HTTP == nil || decoded.HTTP.URL != "https://resolver.example/resolver" || !strings.HasPrefix(forwarder.forward.AffinityKey, "a1_") {
 		t.Fatalf("unexpected forward: %#v", forwarder.forward)
 	}
 }
@@ -61,9 +65,8 @@ func TestCodexEntryRejectsInvalidOrUnavailableToken(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			//nolint:gosec // The values are deliberately invalid test-only credentials.
 			entries, err := service.NewCodexEntryService(&stubGrantResolver{err: test.lookup}, service.APIEntrySettings{
-				DirectiveToken: "dp.22.remote.payload.signature",
+				HMACSecret: "test-hmac-secret",
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -82,9 +85,8 @@ func TestCodexEntryRejectsInvalidOrUnavailableToken(t *testing.T) {
 }
 
 func TestCodexEntryReturnsServiceUnavailableForDatabaseFailure(t *testing.T) {
-	//nolint:gosec // The values are deliberately invalid test-only credentials.
 	entries, err := service.NewCodexEntryService(&stubGrantResolver{err: errors.New("database unavailable")}, service.APIEntrySettings{
-		DirectiveToken: "dp.22.remote.payload.signature",
+		HMACSecret: "test-hmac-secret",
 	})
 	if err != nil {
 		t.Fatal(err)
