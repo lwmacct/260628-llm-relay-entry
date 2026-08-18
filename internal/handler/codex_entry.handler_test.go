@@ -15,10 +15,9 @@ import (
 
 func TestCodexEntryAuthorizesAndForwardsResponses(t *testing.T) {
 	token := testAPIToken()
-	//nolint:gosec // These UUIDs are non-secret test fixture identifiers.
 	grants := &stubGrantResolver{grant: repository.APITokenGrant{
 		APIKeyID: 42, UserID: 7, BindingID: "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b2",
-		VendorCredentialID: "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b3",
+		VendorRouteID: "01990f4a-9e4c-7c42-a7ec-5c3f37a6f6b3",
 	}}
 	//nolint:gosec // The values are deliberately invalid test-only credentials.
 	entries, err := service.NewCodexEntryService(grants, service.APIEntrySettings{
@@ -42,7 +41,7 @@ func TestCodexEntryAuthorizesAndForwardsResponses(t *testing.T) {
 	if grants.received.Token != token {
 		t.Fatalf("unexpected token lookup: %#v", grants.received)
 	}
-	if forwarder.forward.DirectiveToken != "dp.22.remote.payload.signature" || forwarder.forward.VendorCredentialID != grants.grant.VendorCredentialID || !strings.HasPrefix(forwarder.forward.AffinityKey, "a1_") {
+	if forwarder.forward.DirectiveToken != "dp.22.remote.payload.signature" || forwarder.forward.VendorRouteID != grants.grant.VendorRouteID || !strings.HasPrefix(forwarder.forward.AffinityKey, "a1_") {
 		t.Fatalf("unexpected forward: %#v", forwarder.forward)
 	}
 }

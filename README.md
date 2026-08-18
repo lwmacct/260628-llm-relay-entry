@@ -10,23 +10,23 @@ LLM Relay Entry 是公开 API 数据面。它只处理 `POST /v1/responses`，�
 ```text
 User sk-rdp-v1- Token (43-character alphanumeric suffix)
   -> Entry 查询 Console PostgreSQL
-  -> Entry 注入固定 dp.22.remote Token、Credential UUID 和派生亲和键
+  -> Entry 注入固定 dp.22.remote Token、Directive Route UUID 和派生亲和键
   -> directive-proxy
   -> Vendor 统一 resolver /api/resolver（Relay 认证模式）
   -> Vendor API
 ```
 
-Entry 对每个请求执行一次按完整 Token 索引的数据库查询，并同时校验 API Key、用户、Binding、Key 分组、过期时间和 Key 限额。数据库只返回 Vendor Route Credential UUID，不返回 Vendor URL、连接池或上游密钥。
+Entry 对每个请求执行一次按完整 Token 索引的数据库查询，并同时校验 API Key、用户、Binding、Key 分组、过期时间和 Key 限额。数据库只返回 Vendor Directive Route UUID，不返回 Vendor URL、连接池或上游密钥。
 
-用户提供的 `Authorization`、Cookie、代理披露头、`X-Dp-*`、`X-Relay-Credential-ID` 和 `X-Resolver-Affinity-Key` 会在出站前删除。Entry 随后写入服务端固定 Remote Token、数据库解析出的 Credential UUID，以及由 Key ID 和可选 `Session-Id` 派生的亲和键。
+用户提供的 `Authorization`、Cookie、代理披露头、`X-Dp-*`、`X-Relay-Route-ID` 和 `X-Resolver-Affinity-Key` 会在出站前删除。Entry 随后写入服务端固定 Remote Token、数据库解析出的 Directive Route UUID，以及由 Key ID 和可选 `Session-Id` 派生的亲和键。
 
-这里的 Credential UUID 是 Vendor `RouteCredential.id`。Vendor 创建或轮换凭据时返回的
-`remoteSpec.uuid` 当前与该 ID 相同；Relay Binding 应保存这个 UUID，不保存完整 RemoteSpec 或 `dpr_*`。
+这里的 Route UUID 是 Vendor `DirectiveRoute.id`。Vendor 创建 Directive Route 或轮换其 Token 时返回的
+`remoteSpec.uuid` 与该 ID 相同；Relay Binding 应保存这个 UUID，不保存完整 RemoteSpec 或 `dpr_*`。
 Entry 不验证 `dpr_*`，Vendor resolver 的 Relay 模式也不要求它。
 
 ## 固定 Remote Token
 
-固定 Token 的 RemoteSpec 只包含 Vendor resolver URL 和 S2S Bearer，不包含 Route Credential UUID。
+固定 Token 的 RemoteSpec 只包含 Vendor resolver URL 和 S2S Bearer，不包含 Directive Route UUID。
 HTTP 调用实际由 directive-proxy 发起；Vendor 用 S2S Bearer 选择 Relay 认证模式。使用下列命令生成：
 
 ```bash
@@ -47,9 +47,9 @@ app remote-token --resolver-url 'http://127.0.0.1:23188/api/resolver'
 - `DIRECTIVE_PROXY_BASE_URL`：directive-proxy 的内部 HTTP 地址。
 - `PGHOST`、`PGPORT`、`PGUSER`、`PGDATABASE`、`PGPASSWORD`：Console PostgreSQL。
 
-Vendor 的公共凭据与 Relay S2S 模式共用 `/api/resolver` 和 `server.http.listen`。默认同机部署可用
+Vendor 的公共 Directive Route Token 与 Relay S2S 模式共用 `/api/resolver` 和 `server.http.listen`。默认同机部署可用
 `http://127.0.0.1:23188` 省去本机 TLS；跨主机或经公网入口时改用可达的 HTTPS URL。无论传输方式如何，
-Vendor 都会验证 S2S Bearer 和 Credential UUID，Entry 不验证 `dpr_*`。
+Vendor 都会验证 S2S Bearer 和 Directive Route UUID，Entry 不验证 `dpr_*`。
 
 Entry 直接以用户提交的完整 Token 查询 `api_keys.token`。PostgreSQL 账号应只拥有 `api_keys`、`users`、`relay_bindings`、`api_key_groups` 的 `SELECT` 权限；数据库备份和查询日志必须按敏感凭据保护。Entry 不执行建表或迁移。
 

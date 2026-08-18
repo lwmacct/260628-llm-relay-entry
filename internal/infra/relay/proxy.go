@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	HeaderClientRequestID = "X-Client-Request-Id"
-	//nolint:gosec // This is the name of an internal identifier header, not a credential value.
-	HeaderCredentialID     = "X-Relay-Credential-Id"
+	HeaderClientRequestID  = "X-Client-Request-Id"
+	HeaderRouteID          = "X-Relay-Route-Id"
 	HeaderResolverAffinity = "X-Resolver-Affinity-Key"
 	maxErrorBodyBytes      = 256 * 1024
 )
@@ -29,11 +28,11 @@ type errorResponse struct {
 }
 
 type ForwardRequest struct {
-	DirectiveToken     string
-	VendorCredentialID string
-	AffinityKey        string
-	RequestID          string
-	ClientRequestID    string
+	DirectiveToken  string
+	VendorRouteID   string
+	AffinityKey     string
+	RequestID       string
+	ClientRequestID string
 }
 
 type Proxy struct {
@@ -107,7 +106,7 @@ func NewProxy(baseURL string, options ...Option) (*Proxy, error) {
 			forward, _ := forwardRequestFromContext(request.In.Context())
 			rewriteOutboundRequest(request, targetURL)
 			request.Out.Header.Set("Authorization", "Bearer "+forward.DirectiveToken)
-			request.Out.Header.Set(HeaderCredentialID, forward.VendorCredentialID)
+			request.Out.Header.Set(HeaderRouteID, forward.VendorRouteID)
 			request.Out.Header.Set(HeaderResolverAffinity, forward.AffinityKey)
 			if forward.ClientRequestID != "" {
 				request.Out.Header.Set(HeaderClientRequestID, forward.ClientRequestID)
@@ -157,7 +156,7 @@ func stripUntrustedHeaders(header http.Header) {
 		lower := strings.ToLower(strings.TrimSpace(key))
 		if lower == "authorization" || lower == "proxy-authorization" || lower == "cookie" || lower == "cookie2" ||
 			lower == "x-proxy-directive" || lower == "m-runtime-key" || lower == "session-id" || lower == "session_id" ||
-			lower == strings.ToLower(HeaderCredentialID) || lower == strings.ToLower(HeaderResolverAffinity) ||
+			strings.HasPrefix(lower, "x-relay-") || lower == strings.ToLower(HeaderResolverAffinity) ||
 			strings.HasPrefix(lower, "x-dp-") || strings.HasPrefix(lower, "cf-") || strings.HasPrefix(lower, "x-forwarded-") ||
 			lower == "forwarded" || lower == "via" || lower == "x-real-ip" || lower == "true-client-ip" || lower == "cdn-loop" {
 			header.Del(key)

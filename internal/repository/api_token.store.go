@@ -13,7 +13,7 @@ func (s *Store) FetchAPITokenGrant(ctx context.Context, lookup APITokenLookup) (
 		ColumnExpr("ak.id AS api_key_id").
 		ColumnExpr("ak.user_id AS user_id").
 		ColumnExpr("ak.binding_id AS binding_id").
-		ColumnExpr("rb.vendor_credential_id AS vendor_credential_id").
+		ColumnExpr("rb.vendor_route_id AS vendor_route_id").
 		Join("JOIN users AS u ON u.id = ak.user_id").
 		Join("JOIN relay_bindings AS rb ON rb.id = ak.binding_id").
 		Join("LEFT JOIN api_key_groups AS akg ON akg.id = ak.group_id").

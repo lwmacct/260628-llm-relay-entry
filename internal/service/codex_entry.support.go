@@ -40,10 +40,10 @@ type CodexPreparedForward struct {
 }
 
 type CodexResolvedCredential struct {
-	APIKeyID           int64
-	UserID             int64
-	BindingID          string
-	VendorCredentialID string
+	APIKeyID      int64
+	UserID        int64
+	BindingID     string
+	VendorRouteID string
 }
 
 type APITokenGrantResolver interface {
