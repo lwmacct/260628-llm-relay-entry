@@ -31,6 +31,8 @@ github.com/lwmacct/260614-go-pkg-tlsreload v0.15.260716 h1:g3+v6DOeko1QbDxuPsa3D
 github.com/lwmacct/260614-go-pkg-tlsreload v0.15.260716/go.mod h1:2W0xK40pSXql00+H/mt0DBQyoFRUyLtjBxh/s14OY9E=
 github.com/lwmacct/260622-go-pkg-tddcheck v0.23.260814 h1:Dvo6cpvfieTHop+CTkmzuGBPDKMc9pXE53BIKGCeQrw=
 github.com/lwmacct/260622-go-pkg-tddcheck v0.23.260814/go.mod h1:vcBuL7xMgFha98wyMcmTck3z6IADiP7pspe4PRUq0Cg=
+github.com/lwmacct/260628-directive-proxy v0.82.260821 h1:KaNYPdmfVUZqT3PH50RNc8lJzJRru76Y7JlGrVARQ1Y=
+github.com/lwmacct/260628-directive-proxy v0.82.260821/go.mod h1:79QNRN9LLmp61a3wHFYZc0CTEfRD/SOKw9ISHk0ae+I=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/puzpuzpuz/xsync/v3 v3.5.1 h1:GJYJZwO6IdxN/IKbneznS6yPkVC+c3zyY/j19c++5Fg=
