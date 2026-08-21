@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lwmacct/260628-directive-proxy/pkg/directive"
 	"github.com/lwmacct/260628-llm-relay-entry/internal/infra/relay"
 	"github.com/lwmacct/260628-llm-relay-entry/internal/repository"
 	"github.com/lwmacct/260628-llm-relay-entry/internal/service"
+	"github.com/lwmacct/260628-llm-relay-entry/pkg/directive"
 )
 
 func TestCodexEntryAuthorizesAndForwardsResponses(t *testing.T) {
